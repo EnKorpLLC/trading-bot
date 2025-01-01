@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-bot
+  namespace: trading
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trading-bot
+  template:
+    metadata:
+      labels:
+        app: trading-bot
+    spec:
+      containers:
+      - name: trading-bot
+        image: trading-bot:latest
+        imagePullPolicy: Always
+        env:
+        - name: TRADING_ENV
+          value: production
+        - name: DB_HOST
+          value: postgres
+        - name: REDIS_HOST
+          value: redis
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        - name: logs
+          mountPath: /app/logs
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: trading-bot-data
+      - name: logs
+        persistentVolumeClaim:
+          claimName: trading-bot-logs 

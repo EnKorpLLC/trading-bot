@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  trading_bot:
+    build: 
+      context: ..
+      dockerfile: deployment/Dockerfile
+    container_name: trading_bot
+    restart: unless-stopped
+    environment:
+      - TRADING_ENV=production
+      - DB_HOST=postgres
+      - REDIS_HOST=redis
+    volumes:
+      - ../data:/app/data
+      - ../logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:13
+    container_name: trading_bot_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=trading_bot
+      - POSTGRES_USER=trading_bot
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:6
+    container_name: trading_bot_cache
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data: 
