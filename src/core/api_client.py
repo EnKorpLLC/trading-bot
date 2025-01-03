@@ -1,4 +1,4 @@
-from coinbase.rest import RESTClient
+from coinbase.wallet.client import Client as RESTClient
 import logging
 from typing import Optional, Dict, List
 import time

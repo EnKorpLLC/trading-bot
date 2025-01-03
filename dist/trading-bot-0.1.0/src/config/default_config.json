@@ -1,0 +1,25 @@
+{
+    "api_credentials": {
+        "exchange": "",
+        "api_key": "",
+        "api_secret": "",
+        "passphrase": ""
+    },
+    "notifications": {
+        "device_enabled": true,
+        "email_enabled": false,
+        "sms_enabled": false,
+        "sounds_enabled": true,
+        "device_notification_duration": 5,
+        "smtp_server": "",
+        "smtp_port": 587,
+        "smtp_username": "",
+        "smtp_password": "",
+        "email_from": "",
+        "email_to": "",
+        "twilio_account_sid": "",
+        "twilio_auth_token": "",
+        "twilio_from_number": "",
+        "sms_to_number": ""
+    }
+} 

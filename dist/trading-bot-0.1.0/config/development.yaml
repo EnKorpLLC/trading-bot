@@ -1,0 +1,15 @@
+name: development
+description: Development environment configuration
+settings:
+  api_credentials:
+    exchange: "testnet"
+    
+  risk_management:
+    max_position_size: 100
+    max_daily_loss: 50
+    
+  trading:
+    default_timeframe: "5m"
+    
+  performance:
+    cache_enabled: false 

@@ -1,4 +1,4 @@
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 import hashlib
 import jwt
 import datetime
@@ -16,6 +16,15 @@ class License:
     expiry_date: datetime.datetime
     is_active: bool
     features: Dict[str, bool]
+
+@dataclass
+class Coupon:
+    code: str
+    discount_percent: int
+    max_uses: int
+    uses_count: int
+    expiry_date: datetime.datetime
+    created_at: datetime.datetime
 
 class LicenseManager:
     def __init__(self, db_path: Optional[Path] = None):
@@ -158,3 +167,113 @@ class LicenseManager:
         except Exception as e:
             logger.error(f"Error validating coupon: {str(e)}")
             return None 
+
+    def get_coupon(self, code: str) -> Optional[Coupon]:
+        """Get details of a specific coupon."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute("""
+                    SELECT code, discount_percent, max_uses, uses_count, 
+                           expiry_date, created_at 
+                    FROM coupons 
+                    WHERE code = ?
+                """, (code,))
+                
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                    
+                return Coupon(
+                    code=row[0],
+                    discount_percent=row[1],
+                    max_uses=row[2],
+                    uses_count=row[3],
+                    expiry_date=datetime.datetime.fromisoformat(row[4]),
+                    created_at=datetime.datetime.fromisoformat(row[5])
+                )
+                
+        except Exception as e:
+            logger.error(f"Error getting coupon: {str(e)}")
+            return None
+
+    def list_coupons(self, include_expired: bool = False) -> List[Coupon]:
+        """List all coupons."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                query = """
+                    SELECT code, discount_percent, max_uses, uses_count, 
+                           expiry_date, created_at 
+                    FROM coupons
+                """
+                if not include_expired:
+                    query += " WHERE expiry_date > ?"
+                    cursor = conn.execute(query, 
+                                        (datetime.datetime.utcnow().isoformat(),))
+                else:
+                    cursor = conn.execute(query)
+                
+                return [
+                    Coupon(
+                        code=row[0],
+                        discount_percent=row[1],
+                        max_uses=row[2],
+                        uses_count=row[3],
+                        expiry_date=datetime.datetime.fromisoformat(row[4]),
+                        created_at=datetime.datetime.fromisoformat(row[5])
+                    )
+                    for row in cursor.fetchall()
+                ]
+                
+        except Exception as e:
+            logger.error(f"Error listing coupons: {str(e)}")
+            return []
+
+    def delete_coupon(self, code: str) -> bool:
+        """Delete a coupon."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("DELETE FROM coupons WHERE code = ?", (code,))
+                return True
+                
+        except Exception as e:
+            logger.error(f"Error deleting coupon: {str(e)}")
+            return False
+
+    def update_coupon(self, code: str, 
+                     discount_percent: Optional[int] = None,
+                     max_uses: Optional[int] = None,
+                     expiry_date: Optional[datetime.datetime] = None) -> bool:
+        """Update coupon details."""
+        try:
+            updates = []
+            params = []
+            
+            if discount_percent is not None:
+                updates.append("discount_percent = ?")
+                params.append(discount_percent)
+                
+            if max_uses is not None:
+                updates.append("max_uses = ?")
+                params.append(max_uses)
+                
+            if expiry_date is not None:
+                updates.append("expiry_date = ?")
+                params.append(expiry_date.isoformat())
+                
+            if not updates:
+                return False
+                
+            query = f"""
+                UPDATE coupons 
+                SET {', '.join(updates)}
+                WHERE code = ?
+            """
+            params.append(code)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(query, params)
+                return True
+                
+        except Exception as e:
+            logger.error(f"Error updating coupon: {str(e)}")
+            return False 

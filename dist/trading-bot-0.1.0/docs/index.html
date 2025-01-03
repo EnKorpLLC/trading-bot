@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Download Trading Bot</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .price-box {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .price {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .button {
+            display: inline-block;
+            padding: 15px 30px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 18px;
+            margin: 10px;
+            cursor: pointer;
+            border: none;
+        }
+        
+        #coupon-form {
+            margin: 20px 0;
+        }
+        
+        #payment-form {
+            margin: 20px 0;
+        }
+        
+        #card-element {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Trading Bot - Premium Edition</h1>
+        
+        <div class="price-box">
+            <div class="price">$99.99</div>
+            <p>Full access to all features</p>
+            <ul>
+                <li>Advanced Trading Strategies</li>
+                <li>Risk Management Tools</li>
+                <li>Real-time Analytics</li>
+                <li>1 Year of Updates</li>
+            </ul>
+        </div>
+        
+        <div id="coupon-form">
+            <input type="text" id="coupon-code" placeholder="Coupon Code">
+            <button onclick="applyCoupon()" class="button">Apply Coupon</button>
+        </div>
+        
+        <form id="payment-form">
+            <div id="card-element"></div>
+            <div id="card-errors" role="alert"></div>
+            <button type="submit" class="button">
+                Purchase and Download
+            </button>
+        </form>
+    </div>
+    
+    <script>
+        const stripe = Stripe('your_publishable_key');
+        const elements = stripe.elements();
+        const card = elements.create('card');
+        card.mount('#card-element');
+        
+        let currentAmount = 9999; // $99.99 in cents
+        
+        async function applyCoupon() {
+            const code = document.getElementById('coupon-code').value;
+            const response = await fetch('/api/validate-coupon', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ code })
+            });
+            
+            const data = await response.json();
+            if (data.valid) {
+                currentAmount = data.amount;
+                document.querySelector('.price').textContent = 
+                    `$${(currentAmount / 100).toFixed(2)}`;
+            }
+        }
+        
+        const form = document.getElementById('payment-form');
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            const { clientSecret } = await fetch('/api/create-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    amount: currentAmount,
+                    coupon: document.getElementById('coupon-code').value
+                })
+            }).then(r => r.json());
+            
+            const result = await stripe.confirmCardPayment(clientSecret, {
+                payment_method: {
+                    card: card,
+                    billing_details: {
+                        email: document.getElementById('email').value
+                    }
+                }
+            });
+            
+            if (result.error) {
+                const errorElement = document.getElementById('card-errors');
+                errorElement.textContent = result.error.message;
+            } else {
+                // Payment successful, get download link
+                const { downloadUrl } = await fetch('/api/complete-payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        paymentIntent: result.paymentIntent.id
+                    })
+                }).then(r => r.json());
+                
+                window.location.href = downloadUrl;
+            }
+        });
+    </script>
+</body>
+</html> 

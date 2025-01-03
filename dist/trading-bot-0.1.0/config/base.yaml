@@ -1,0 +1,42 @@
+# Base configuration settings
+name: base
+description: Base configuration template
+settings:
+  api_credentials:
+    exchange: ""
+    api_key: ""
+    api_secret: ""
+    passphrase: ""
+    
+  risk_management:
+    max_position_size: 1000
+    max_daily_loss: 500
+    max_drawdown: 0.1
+    max_leverage: 3
+    position_limit: 5
+    max_correlation: 0.7
+    
+  trading:
+    default_timeframe: "1h"
+    allowed_symbols:
+      - "BTC/USD"
+      - "ETH/USD"
+    trading_hours:
+      start: "00:00"
+      end: "23:59"
+    
+  notifications:
+    device_enabled: true
+    email_enabled: false
+    sms_enabled: false
+    sounds_enabled: true
+    
+  performance:
+    cache_enabled: true
+    cache_ttl: 3600
+    metrics_enabled: true
+    
+  security:
+    session_timeout: 86400
+    max_login_attempts: 3
+    encryption_enabled: true 

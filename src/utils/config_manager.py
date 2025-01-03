@@ -15,7 +15,7 @@ class EnvironmentConfig:
     description: str
     settings: Dict
 
-class ConfigurationManager:
+class ConfigManager:
     def __init__(self):
         self.config_dir = Path("config")
         self.config_dir.mkdir(parents=True, exist_ok=True)

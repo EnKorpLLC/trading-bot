@@ -7,7 +7,8 @@ from email.mime.multipart import MIMEMultipart
 import requests
 from pathlib import Path
 import json
-from PyQt6.QtCore import QSystemTrayIcon, QIcon
+from PyQt6.QtWidgets import QSystemTrayIcon
+from PyQt6.QtGui import QIcon
 from twilio.rest import Client
 from ..utils.config_manager import ConfigManager
 from .sound_manager import SoundManager
