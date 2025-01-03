@@ -82,7 +82,7 @@ class InstallerGUI:
             self.progress['value'] = 20
             
             # Download and extract main package
-            package_url = f"https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest/download/latest.zip"
+            package_url = f"https://github.com/EnKorpLLC/trading-bot/releases/latest/download/latest.zip"
             package_path = install_dir / "package.zip"
             urllib.request.urlretrieve(package_url, package_path)
             

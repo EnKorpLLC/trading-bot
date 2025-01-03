@@ -7,7 +7,7 @@ from pathlib import Path
 def main():
     try:
         print("Downloading installer...")
-        installer_url = f"https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest/download/installer.exe"
+        installer_url = f"https://github.com/EnKorpLLC/trading-bot/releases/latest/download/installer.exe"
         installer_path = Path(os.environ['TEMP']) / "trading_bot_installer.exe"
         
         urllib.request.urlretrieve(installer_url, installer_path)
