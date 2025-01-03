@@ -51,4 +51,9 @@ pandas-stubs>=1.2.0
 
 # Optional dependencies
 python-telegram-bot>=13.7  # For telegram notifications
-twilio>=7.0.0  # For SMS notifications 
+twilio>=7.0.0  # For SMS notifications
+
+# Installation dependencies
+pywin32>=305; platform_system == "Windows"
+winshell>=0.6; platform_system == "Windows"
+pyinstaller>=5.13.0 

@@ -5,13 +5,23 @@ import zipfile
 import subprocess
 import tkinter as tk
 from tkinter import ttk
+from pathlib import Path
 import threading
+
+# Only import Windows-specific modules if on Windows
+if os.name == 'nt':  # Windows
+    import winshell  # type: ignore
+    from win32com.client import Dispatch  # type: ignore
+else:
+    winshell = None
+    Dispatch = None
 
 class InstallerGUI:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Trading Bot Installer")
         self.root.geometry("400x300")
+        self.root.iconbitmap("assets/icon.ico")  # We'll need to create this
         
         # Center window
         screen_width = self.root.winfo_screenwidth()
@@ -28,24 +38,22 @@ class InstallerGUI:
         self.title_label = ttk.Label(
             self.main_frame, 
             text="Trading Bot Installer",
-            font=('Helvetica', 16, 'bold')
+            font=("Helvetica", 16)
         )
         self.title_label.grid(row=0, column=0, pady=20)
         
         # Add progress bar
         self.progress = ttk.Progressbar(
-            self.main_frame,
-            orient="horizontal",
+            self.main_frame, 
             length=300,
-            mode="determinate"
+            mode='determinate'
         )
         self.progress.grid(row=1, column=0, pady=20)
         
         # Add status label
         self.status_label = ttk.Label(
             self.main_frame,
-            text="Ready to install",
-            wraplength=300
+            text="Ready to install"
         )
         self.status_label.grid(row=2, column=0, pady=10)
         
@@ -58,99 +66,104 @@ class InstallerGUI:
         self.install_button.grid(row=3, column=0, pady=20)
         
     def start_installation(self):
+        """Start the installation process in a separate thread."""
         self.install_button.state(['disabled'])
         thread = threading.Thread(target=self.install)
         thread.start()
         
-    def update_status(self, message, progress=None):
-        self.status_label['text'] = message
-        if progress is not None:
-            self.progress['value'] = progress
-        self.root.update()
-        
     def install(self):
+        """Perform the installation."""
         try:
-            # Update status
-            self.update_status("Checking Python installation...", 0)
+            self.update_status("Creating directories...")
+            install_dir = Path(os.path.expanduser("~/Trading Bot"))
+            install_dir.mkdir(parents=True, exist_ok=True)
             
-            # Check Python version
-            if sys.version_info < (3, 9):
-                raise RuntimeError("Python 3.9 or higher is required")
+            self.update_status("Downloading files...")
+            self.progress['value'] = 20
             
-            # Download latest release
-            self.update_status("Downloading Trading Bot...", 20)
-            release_url = "https://github.com/yourusername/trading-bot/releases/latest/download/trading-bot.zip"
-            download_path = os.path.join(os.path.expanduser("~"), "Downloads", "trading-bot.zip")
-            urllib.request.urlretrieve(release_url, download_path)
+            # Download and extract main package
+            package_url = f"https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest/download/latest.zip"
+            package_path = install_dir / "package.zip"
+            urllib.request.urlretrieve(package_url, package_path)
             
-            # Create installation directory
-            self.update_status("Creating installation directory...", 40)
-            install_dir = os.path.join(os.path.expanduser("~"), "TradingBot")
-            os.makedirs(install_dir, exist_ok=True)
+            self.update_status("Extracting files...")
+            self.progress['value'] = 40
             
-            # Extract files
-            self.update_status("Extracting files...", 60)
-            with zipfile.ZipFile(download_path, 'r') as zip_ref:
+            with zipfile.ZipFile(package_path, 'r') as zip_ref:
                 zip_ref.extractall(install_dir)
+            package_path.unlink()  # Remove zip file
+            
+            self.update_status("Installing Python...")
+            self.progress['value'] = 60
+            
+            # Install Python if not present
+            if not self._check_python():
+                self._install_python()
+            
+            self.update_status("Installing dependencies...")
+            self.progress['value'] = 80
             
             # Install dependencies
-            self.update_status("Installing dependencies...", 80)
-            if sys.platform == 'win32':
-                subprocess.run([
-                    'cmd', '/c', 
-                    os.path.join(install_dir, 'scripts', 'install.bat')
-                ], cwd=install_dir)
-            else:
-                subprocess.run([
-                    'bash',
-                    os.path.join(install_dir, 'scripts', 'install.sh')
-                ], cwd=install_dir)
+            subprocess.run([
+                sys.executable, 
+                "-m", "pip", 
+                "install", 
+                "-r", 
+                str(install_dir / "requirements.txt")
+            ])
+            
+            self.update_status("Creating shortcuts...")
+            self.progress['value'] = 90
             
             # Create desktop shortcut
-            self.update_status("Creating desktop shortcut...", 90)
-            self.create_shortcut(install_dir)
+            self._create_shortcut(install_dir)
             
-            # Cleanup
-            os.remove(download_path)
+            self.update_status("Installation complete!")
+            self.progress['value'] = 100
             
-            # Installation complete
-            self.update_status("Installation complete!\nYou can now run Trading Bot from your desktop.", 100)
-            self.install_button['text'] = "Finish"
-            self.install_button['command'] = self.root.destroy
             self.install_button.state(['!disabled'])
+            self.install_button.configure(text="Finish", command=self.root.destroy)
             
         except Exception as e:
             self.update_status(f"Error: {str(e)}")
-            self.install_button['text'] = "Retry"
             self.install_button.state(['!disabled'])
-            
-    def create_shortcut(self, install_dir):
-        if sys.platform == 'win32':
-            # Windows shortcut
-            desktop = os.path.join(os.path.expanduser("~"), "Desktop")
-            shortcut_path = os.path.join(desktop, "Trading Bot.lnk")
-            
-            import winshell
-            from win32com.client import Dispatch
-            
-            shell = Dispatch('WScript.Shell')
-            shortcut = shell.CreateShortCut(shortcut_path)
-            shortcut.Targetpath = os.path.join(install_dir, "venv", "Scripts", "trading-bot.exe")
-            shortcut.WorkingDirectory = install_dir
-            shortcut.save()
-        else:
-            # Linux/macOS desktop entry
-            desktop = os.path.join(os.path.expanduser("~"), "Desktop")
-            shortcut_path = os.path.join(desktop, "Trading Bot.desktop")
-            
-            with open(shortcut_path, 'w') as f:
-                f.write(f"""[Desktop Entry]
-Name=Trading Bot
-Exec={install_dir}/venv/bin/trading-bot
-Type=Application
-Terminal=false
-""")
-            os.chmod(shortcut_path, 0o755)
+    
+    def update_status(self, message: str):
+        """Update the status label."""
+        self.status_label['text'] = message
+        self.root.update()
+    
+    def _check_python(self) -> bool:
+        """Check if Python is installed."""
+        try:
+            subprocess.run([sys.executable, "--version"], check=True)
+            return True
+        except:
+            return False
+    
+    def _install_python(self):
+        """Download and install Python."""
+        python_url = "https://www.python.org/ftp/python/3.9.7/python-3.9.7-amd64.exe"
+        installer_path = Path(os.environ['TEMP']) / "python_installer.exe"
+        
+        urllib.request.urlretrieve(python_url, installer_path)
+        subprocess.run([str(installer_path), "/quiet", "PrependPath=1"])
+    
+    def _create_shortcut(self, install_dir: Path):
+        """Create desktop shortcut."""
+        if os.name != 'nt':  # Not Windows
+            self.update_status("Shortcut creation skipped (non-Windows system)")
+            return
+
+        desktop = Path(winshell.desktop())
+        shortcut_path = desktop / "Trading Bot.lnk"
+        
+        shell = Dispatch('WScript.Shell')
+        shortcut = shell.CreateShortCut(str(shortcut_path))
+        shortcut.Targetpath = str(install_dir / "trading_bot.exe")
+        shortcut.WorkingDirectory = str(install_dir)
+        shortcut.IconLocation = str(install_dir / "assets/icon.ico")
+        shortcut.save()
 
 def main():
     installer = InstallerGUI()

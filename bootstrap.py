@@ -1,18 +1,17 @@
-import sys
 import urllib.request
 import subprocess
+import sys
+import os
+from pathlib import Path
 
 def main():
-    # URL of the installer
-    installer_url = "https://github.com/yourusername/trading-bot/releases/latest/download/installer.py"
-    
     try:
-        # Download installer
         print("Downloading installer...")
-        urllib.request.urlretrieve(installer_url, "installer.py")
+        installer_url = f"https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest/download/installer.exe"
+        installer_path = Path(os.environ['TEMP']) / "trading_bot_installer.exe"
         
-        # Run installer
-        subprocess.run([sys.executable, "installer.py"])
+        urllib.request.urlretrieve(installer_url, installer_path)
+        subprocess.run([str(installer_path)])
         
     except Exception as e:
         print(f"Error: {str(e)}")
