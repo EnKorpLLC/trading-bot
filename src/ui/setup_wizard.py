@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import (
     QWizard, QWizardPage, QLabel, QLineEdit, 
-    QVBoxLayout, QTextEdit, QPushButton, QMessageBox
+    QVBoxLayout, QTextEdit, QPushButton, QMessageBox,
+    QCheckBox
 )
 from PyQt6.QtCore import Qt
 import webbrowser
@@ -32,7 +33,8 @@ class APISetupWizard(QWizard):
             
         return {
             'api_key': self.field('api_key'),
-            'api_secret': self.field('api_secret')
+            'api_secret': self.field('api_secret'),
+            'use_demo': self.field('use_demo')
         }
 
 class IntroPage(QWizardPage):
@@ -43,10 +45,10 @@ class IntroPage(QWizardPage):
         layout = QVBoxLayout()
         intro_text = QLabel(
             "This wizard will help you set up your trading bot by guiding you "
-            "through the process of obtaining and configuring your API credentials.\n\n"
+            "through the process of obtaining and configuring your TradeLocker API credentials.\n\n"
             "Before proceeding, please ensure you have:\n"
-            "• A Trade Locker account\n"
-            "• Access to your Trade Locker dashboard\n\n"
+            "• A TradeLocker account\n"
+            "• Access to your TradeLocker dashboard\n\n"
             "You can skip this setup and configure your API credentials later.\n\n"
             "Click Next to begin the setup process, or Skip for Now to explore the application."
         )
@@ -57,27 +59,27 @@ class IntroPage(QWizardPage):
 class APIKeyInstructionsPage(QWizardPage):
     def __init__(self):
         super().__init__()
-        self.setTitle("Getting Your API Keys")
+        self.setTitle("Getting Your TradeLocker API Keys")
         
         layout = QVBoxLayout()
         
         instructions = QLabel(
             "Follow these steps to get your API keys:\n\n"
-            "1. Log in to your Trade Locker account\n"
+            "1. Log in to your TradeLocker account\n"
             "2. Go to Settings > API Keys\n"
             "3. Click 'Create New API Key'\n"
             "4. Set the following permissions:\n"
             "   • View account information\n"
             "   • Trade\n"
-            "5. Copy both the API Key and Secret Key\n\n"
-            "Click the button below to open Trade Locker in your browser:"
+            "5. Copy both the API Key and Secret\n\n"
+            "Click the button below to open TradeLocker in your browser:"
         )
         instructions.setWordWrap(True)
         layout.addWidget(instructions)
         
-        open_browser_btn = QPushButton("Open Trade Locker")
+        open_browser_btn = QPushButton("Open TradeLocker")
         open_browser_btn.clicked.connect(
-            lambda: webbrowser.open("https://trade-locker.com/dashboard")
+            lambda: webbrowser.open("https://tradelocker.com/dashboard")
         )
         layout.addWidget(open_browser_btn)
         
@@ -87,7 +89,7 @@ class APIKeyInstructionsPage(QWizardPage):
 class APIKeyInputPage(QWizardPage):
     def __init__(self):
         super().__init__()
-        self.setTitle("Enter Your API Credentials")
+        self.setTitle("Enter Your TradeLocker API Credentials")
         
         layout = QVBoxLayout()
         
@@ -99,14 +101,35 @@ class APIKeyInputPage(QWizardPage):
         
         # API Secret input
         layout.addWidget(QLabel("API Secret:"))
-        self.api_secret_input = QTextEdit()
-        self.api_secret_input.setPlaceholderText("Enter your API secret (including BEGIN and END lines)")
-        self.api_secret_input.setMinimumHeight(100)
+        self.api_secret_input = QLineEdit()
+        self.api_secret_input.setPlaceholderText("Enter your API secret")
+        self.api_secret_input.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addWidget(self.api_secret_input)
+        
+        # Demo mode checkbox
+        self.demo_checkbox = QCheckBox("Use Demo Environment (Recommended for testing)")
+        self.demo_checkbox.setChecked(True)
+        layout.addWidget(self.demo_checkbox)
+        
+        # Warning for live mode
+        self.live_warning = QLabel(
+            "\nWarning: Live mode will use real funds. "
+            "Make sure you understand the risks before using live trading."
+        )
+        self.live_warning.setStyleSheet("color: red;")
+        self.live_warning.setWordWrap(True)
+        self.live_warning.setVisible(False)
+        layout.addWidget(self.live_warning)
+        
+        # Connect demo checkbox to warning visibility
+        self.demo_checkbox.stateChanged.connect(
+            lambda state: self.live_warning.setVisible(not bool(state))
+        )
         
         # Register fields
         self.registerField('api_key*', self.api_key_input)
-        self.registerField('api_secret*', self.api_secret_input, 'plainText')
+        self.registerField('api_secret*', self.api_secret_input)
+        self.registerField('use_demo', self.demo_checkbox)
         
         layout.addStretch()
         self.setLayout(layout) 

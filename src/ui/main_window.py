@@ -239,13 +239,16 @@ class MainWindow(QMainWindow):
             if credentials:
                 success = self.trading_engine.set_credentials(
                     credentials['api_key'],
-                    credentials['api_secret']
+                    credentials['api_secret'],
+                    credentials['use_demo']
                 )
                 if success:
+                    mode = "Demo" if credentials['use_demo'] else "Live"
                     QMessageBox.information(
                         self,
                         "Success",
-                        "API credentials configured successfully!"
+                        f"API credentials configured successfully!\n\n"
+                        f"Trading Mode: {mode}"
                     )
                 else:
                     QMessageBox.warning(

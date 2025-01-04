@@ -12,3 +12,29 @@ winshell>=0.6; platform_system == "Windows"
 
 # Optional dependencies
 twilio>=7.0.0  # For SMS notifications 
+
+# TradeLocker dependencies
+altgraph==0.17.4
+bottle==0.13.2
+certifi==2024.12.14
+charset-normalizer==3.4.1
+idna==3.10
+numpy==2.2.1
+packaging==24.2
+pandas==2.2.1
+pefile==2023.2.7
+pyinstaller==6.11.1
+pyinstaller-hooks-contrib==2024.11
+python-dateutil==2.9.0.post0
+pytz==2024.2
+pywin32==308
+pywin32-ctypes==0.2.2
+requests==2.32.2
+six==1.17.0
+tradelocker==0.56.2
+typing_extensions==4.12.2
+tzdata==2024.2
+urllib3==2.3.0
+winshell==0.6
+zope.event==5.0
+zope.interface==7.2 

@@ -26,13 +26,13 @@ class TradingEngine:
         if api_key and api_secret:
             self.set_credentials(api_key, api_secret)
     
-    def set_credentials(self, api_key: str, api_secret: str) -> bool:
+    def set_credentials(self, api_key: str, api_secret: str, use_demo: bool = True) -> bool:
         """Set API credentials and initialize the API client."""
         try:
-            self.api_client = TradingAPIClient(api_key, api_secret)
+            self.api_client = TradingAPIClient(api_key, api_secret, use_demo)
             # Test the connection
             self.api_client.test_connection()
-            logger.info("API credentials set successfully")
+            logger.info(f"API credentials set successfully (Mode: {'Demo' if use_demo else 'Live'})")
             return True
         except Exception as e:
             logger.error(f"Failed to set API credentials: {str(e)}")
