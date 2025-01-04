@@ -12,6 +12,7 @@ from PyQt6.QtGui import QIcon
 from twilio.rest import Client
 from ..utils.config_manager import ConfigManager
 from .sound_manager import SoundManager
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +155,11 @@ class NotificationManager:
         """Setup system tray icon."""
         try:
             tray = QSystemTrayIcon()
-            tray.setIcon(QIcon("icons/app_icon.png"))
+            # Update icon path to use assets directory
+            icon_path = Path(sys.executable).parent / "assets" / "icon.ico"
+            if not icon_path.exists():
+                icon_path = Path("assets") / "icon.ico"
+            tray.setIcon(QIcon(str(icon_path)))
             tray.setVisible(True)
             return tray
         except Exception as e:
@@ -247,3 +252,13 @@ class NotificationManager:
                 
         except Exception as e:
             logger.error(f"Error recording notification: {str(e)}") 
+            
+    def notify_installation_complete(self):
+        """Send notification when installation is complete."""
+        self.send_notification(
+            title="Installation Complete",
+            message="Trading Bot has been successfully installed!",
+            priority="normal",
+            channels=["device"],
+            sound="success"
+        ) 

@@ -13,8 +13,8 @@ from ..utils.trade_logger import TradeLogger
 logger = logging.getLogger(__name__)
 
 class TradingEngine:
-    def __init__(self, api_key: str, api_secret: str):
-        self.api_client = TradingAPIClient(api_key, api_secret)
+    def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None):
+        self.api_client = None
         self.risk_manager = RiskManager()
         self.market_analyzer = MarketAnalyzer()
         self.strategy_manager = StrategyManager()
@@ -23,6 +23,48 @@ class TradingEngine:
         self.market_data: Dict[str, pd.DataFrame] = {}
         self.require_user_confirmation: bool = False  # Default to automated trading
         
+        if api_key and api_secret:
+            self.set_credentials(api_key, api_secret)
+    
+    def set_credentials(self, api_key: str, api_secret: str) -> bool:
+        """Set API credentials and initialize the API client."""
+        try:
+            self.api_client = TradingAPIClient(api_key, api_secret)
+            # Test the connection
+            self.api_client.test_connection()
+            logger.info("API credentials set successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set API credentials: {str(e)}")
+            return False
+    
+    def has_credentials(self) -> bool:
+        """Check if API credentials are set."""
+        return self.api_client is not None
+    
+    def get_connection_status(self) -> Dict[str, bool]:
+        """Get the current connection status."""
+        if not self.api_client:
+            return {
+                'has_credentials': False,
+                'is_connected': False,
+                'can_trade': False
+            }
+        
+        try:
+            is_connected = self.api_client.test_connection()
+            return {
+                'has_credentials': True,
+                'is_connected': is_connected,
+                'can_trade': is_connected
+            }
+        except:
+            return {
+                'has_credentials': True,
+                'is_connected': False,
+                'can_trade': False
+            }
+    
     def add_strategy(self, strategy: BaseStrategy) -> None:
         """Add a trading strategy to the engine."""
         self.strategy_manager.add_strategy(strategy)

@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "release_date": "2024-01-03",
+    "min_windows_version": "10.0",
+    "sha256": "69731D2272E30B124592F4A1D9D223E49CF0FA6FE568E281012DE8BCF2154581",
+    "release_notes": [
+        "Initial release of Trading Bot",
+        "One-click installation",
+        "Automatic desktop shortcut creation",
+        "Auto-launch capability"
+    ],
+    "files": {
+        "trading_bot.exe": {
+            "sha256": "69731D2272E30B124592F4A1D9D223E49CF0FA6FE568E281012DE8BCF2154581",
+            "size": 94201663
+        },
+        "bootstrap.exe": {
+            "sha256": "9770905687E25E74CD18460E65A2624FF6BC601BA7410A67D6D2CF13AF449A66",
+            "size": 7732618
+        }
+    }
+} 

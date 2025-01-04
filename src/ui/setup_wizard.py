@@ -21,8 +21,15 @@ class APISetupWizard(QWizard):
         
         self.setMinimumWidth(600)
         
+        # Add a Skip button
+        self.setButtonText(QWizard.WizardButton.CancelButton, "Skip for Now")
+        self.setOption(QWizard.WizardOption.NoCancelButton, False)
+        
     def get_credentials(self):
-        """Return the API credentials entered by user."""
+        """Return the API credentials entered by user or None if skipped."""
+        if self.result() == QWizard.DialogCode.Rejected:
+            return None
+            
         return {
             'api_key': self.field('api_key'),
             'api_secret': self.field('api_secret')
@@ -40,7 +47,8 @@ class IntroPage(QWizardPage):
             "Before proceeding, please ensure you have:\n"
             "• A Trade Locker account\n"
             "• Access to your Trade Locker dashboard\n\n"
-            "Click Next to begin the setup process."
+            "You can skip this setup and configure your API credentials later.\n\n"
+            "Click Next to begin the setup process, or Skip for Now to explore the application."
         )
         intro_text.setWordWrap(True)
         layout.addWidget(intro_text)

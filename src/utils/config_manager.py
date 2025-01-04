@@ -6,6 +6,8 @@ import yaml
 import os
 from dataclasses import dataclass
 from copy import deepcopy
+import sys
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +17,13 @@ class EnvironmentConfig:
     description: str
     settings: Dict
 
+@dataclass
+class InstallConfig:
+    version: str
+    install_date: str
+    install_path: Path
+    last_update_check: str
+
 class ConfigManager:
     def __init__(self):
         self.config_dir = Path("config")
@@ -23,6 +32,8 @@ class ConfigManager:
         self.configs: Dict[str, Dict] = {}
         self.env_configs: Dict[str, EnvironmentConfig] = {}
         self.loaded_files = set()
+        self.version = "0.2.0"
+        self.install_config = self._load_install_config()
         
         # Load configurations
         self._load_base_config()
@@ -210,3 +221,30 @@ class ConfigManager:
                 
         except Exception as e:
             logger.error(f"Error saving config: {str(e)}") 
+
+    def _load_install_config(self) -> InstallConfig:
+        """Load or create installation configuration."""
+        install_file = Path.home() / ".trading-bot" / "install.json"
+        install_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        if install_file.exists():
+            try:
+                with open(install_file) as f:
+                    data = json.load(f)
+                return InstallConfig(**data)
+            except Exception as e:
+                logger.error(f"Error loading install config: {str(e)}")
+                
+        # Create new install config
+        config = InstallConfig(
+            version=self.version,
+            install_date=datetime.now().isoformat(),
+            install_path=Path(sys.executable).parent,
+            last_update_check=datetime.now().isoformat()
+        )
+        
+        # Save config
+        with open(install_file, 'w') as f:
+            json.dump(config.__dict__, f, indent=2, default=str)
+            
+        return config 

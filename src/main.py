@@ -1,8 +1,25 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox, QLineEdit
+import os
+from PyQt6.QtWidgets import QApplication
+
+def get_base_path():
+    """Get the base path for the application, works both in development and when frozen"""
+    if getattr(sys, 'frozen', False):
+        # If the application is run as a bundle (frozen)
+        return os.path.dirname(sys.executable)
+    # If running from source
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Set up the base path
+base_path = get_base_path()
+if base_path not in sys.path:
+    sys.path.insert(0, base_path)
+
 from src.ui.main_window import MainWindow
-from .core.engine import TradingEngine
-from .utils.theme_manager import ThemeManager
+from src.core.engine import TradingEngine
+from src.utils.theme_manager import ThemeManager
+
+__version__ = "0.2.0"
 
 def main():
     app = QApplication(sys.argv)
@@ -11,18 +28,8 @@ def main():
     theme_manager = ThemeManager()
     theme_manager.apply_theme(app)
     
-    # Prompt the user for their API key and secret using input dialogs
-    api_key, ok1 = QInputDialog.getText(None, "API Key", "Please enter your API key:")
-    if not ok1 or not api_key:
-        QMessageBox.critical(None, "Error", "API key is required.")
-        return  # Exit if no API key is provided
-
-    api_secret, ok2 = QInputDialog.getText(None, "API Secret", "Please enter your API secret:", QLineEdit.EchoMode.Password)
-    if not ok2 or not api_secret:
-        QMessageBox.critical(None, "Error", "API secret is required.")
-        return  # Exit if no API secret is provided
-    
-    trading_engine = TradingEngine(api_key, api_secret)
+    # Create trading engine without credentials initially
+    trading_engine = TradingEngine(api_key=None, api_secret=None)
     
     # Create and show main window
     window = MainWindow(trading_engine)

@@ -39,10 +39,6 @@ class MainWindow(QMainWindow):
             parent_widget=self
         )
         
-        # Check for API credentials
-        if not self.check_api_credentials():
-            self.show_setup_wizard()
-            
         self.init_ui()
         
         # Update timer for real-time data
@@ -53,6 +49,25 @@ class MainWindow(QMainWindow):
         # Initialize notification manager
         self.notification_manager = NotificationManager()
         
+        # Show welcome message
+        self.show_welcome_message()
+        
+    def show_welcome_message(self):
+        """Show a welcome message introducing the application."""
+        welcome = QMessageBox(self)
+        welcome.setIcon(QMessageBox.Icon.Information)
+        welcome.setWindowTitle("Welcome to Trading Bot")
+        welcome.setText(
+            "Welcome to Trading Bot!\n\n"
+            "Feel free to explore the interface and familiarize yourself with the features:\n\n"
+            "• Market Analysis - View market data and trends\n"
+            "• Strategies - Configure and test trading strategies\n"
+            "• Active Trades - Monitor your trading activity\n\n"
+            "When you're ready to start trading, you'll need to connect your Trade Locker account.\n"
+            "You can do this anytime through the Settings menu."
+        )
+        welcome.exec()
+        
     def init_ui(self):
         """Initialize the user interface."""
         self.setWindowTitle('Trading Bot Control Panel')
@@ -62,6 +77,9 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
+        
+        # Create menu bar
+        self._create_menu_bar()
         
         # Create control panel
         control_panel = self.create_control_panel()
@@ -85,6 +103,21 @@ class MainWindow(QMainWindow):
         
         # Add independent mode controls
         self._add_independent_mode_controls()
+        
+    def _create_menu_bar(self):
+        """Create the application menu bar."""
+        menubar = self.menuBar()
+        
+        # Settings menu
+        settings_menu = menubar.addMenu('Settings')
+        
+        # API Setup action
+        api_setup_action = settings_menu.addAction('Configure API Credentials')
+        api_setup_action.triggered.connect(self.show_setup_wizard)
+        
+        # Theme toggle action
+        theme_action = settings_menu.addAction('Toggle Theme')
+        theme_action.triggered.connect(self.toggle_theme)
         
     def create_control_panel(self) -> QWidget:
         """Create the top control panel."""
@@ -137,6 +170,18 @@ class MainWindow(QMainWindow):
         """Enable or disable trading."""
         enabled = bool(state)
         if enabled:
+            if not self.trading_engine.has_credentials():
+                response = QMessageBox.question(
+                    self,
+                    "API Credentials Required",
+                    "To enable trading, you need to connect your Trade Locker account.\n\n"
+                    "Would you like to set up your API credentials now?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if response == QMessageBox.StandardButton.Yes:
+                    self.show_setup_wizard()
+                self.trading_enabled.setChecked(False)
+                return
             # Add safety confirmation
             # TODO: Add confirmation dialog
             logger.info("Trading enabled")
@@ -184,17 +229,39 @@ class MainWindow(QMainWindow):
         
     def check_api_credentials(self) -> bool:
         """Check if API credentials are configured."""
-        # Implement your credential checking logic here
-        return False  # For testing, always show wizard
+        return self.trading_engine.has_credentials()
         
     def show_setup_wizard(self):
         """Show the API setup wizard."""
         wizard = APISetupWizard(self)
         if wizard.exec():
             credentials = wizard.get_credentials()
-            # Update trading engine with new credentials
-            # TODO: Implement credential update in trading engine
-            
+            if credentials:
+                success = self.trading_engine.set_credentials(
+                    credentials['api_key'],
+                    credentials['api_secret']
+                )
+                if success:
+                    QMessageBox.information(
+                        self,
+                        "Success",
+                        "API credentials configured successfully!"
+                    )
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "Error",
+                        "Failed to verify API credentials. Please try again."
+                    )
+        else:
+            # User clicked "Skip for Now"
+            QMessageBox.information(
+                self,
+                "Setup Skipped",
+                "You can configure your API credentials later through the Settings menu.\n\n"
+                "For now, you can explore the application's features in demo mode."
+            )
+        
     def toggle_theme(self):
         """Toggle between light and dark themes."""
         self.theme_manager.toggle_theme(QApplication.instance()) 
