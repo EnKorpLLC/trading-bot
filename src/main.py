@@ -15,9 +15,15 @@ base_path = get_base_path()
 if base_path not in sys.path:
     sys.path.insert(0, base_path)
 
-from src.ui.main_window import MainWindow
-from src.core.engine import TradingEngine
-from src.utils.theme_manager import ThemeManager
+# Modify imports to work with both source and frozen versions
+if getattr(sys, 'frozen', False):
+    from ui.main_window import MainWindow
+    from core.engine import TradingEngine
+    from utils.theme_manager import ThemeManager
+else:
+    from src.ui.main_window import MainWindow
+    from src.core.engine import TradingEngine
+    from src.utils.theme_manager import ThemeManager
 
 __version__ = "0.2.0"
 
