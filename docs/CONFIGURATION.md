@@ -25,6 +25,15 @@ TRADELOCKER_API_KEY=your_api_key
 TRADELOCKER_API_SECRET=your_api_secret
 ```
 
+### Technical Analysis
+```env
+# Custom indicator settings
+INDICATOR_UPDATE_INTERVAL=1000
+INDICATOR_HISTORY_SIZE=100
+VOLATILITY_WINDOW=14
+VOLUME_MA_PERIOD=20
+```
+
 ### Authentication
 ```env
 JWT_SECRET=your_jwt_secret
