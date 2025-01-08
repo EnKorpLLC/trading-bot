@@ -4,9 +4,12 @@ import numpy as np
 from ..core.market_analyzer import MarketCondition
 from .base_strategy import BaseStrategy
 import logging
-import talib
 
 logger = logging.getLogger(__name__)
+
+def calculate_ema(data: pd.Series, period: int) -> pd.Series:
+    """Calculate Exponential Moving Average"""
+    return data.ewm(span=period, adjust=False).mean()
 
 class FibonacciStrategy(BaseStrategy):
     def __init__(self):
@@ -64,10 +67,10 @@ class FibonacciStrategy(BaseStrategy):
         
     def _identify_trend(self, df: pd.DataFrame) -> Dict:
         """Identify market trend using multiple timeframes."""
-        # Calculate EMAs for trend determination
-        ema20 = talib.EMA(df['close'], timeperiod=20)
-        ema50 = talib.EMA(df['close'], timeperiod=50)
-        ema200 = talib.EMA(df['close'], timeperiod=200)
+        # Replace talib.EMA with custom EMA implementation
+        ema20 = calculate_ema(df['close'], timeperiod=20)
+        ema50 = calculate_ema(df['close'], timeperiod=50)
+        ema200 = calculate_ema(df['close'], timeperiod=200)
         
         current_price = df['close'].iloc[-1]
         

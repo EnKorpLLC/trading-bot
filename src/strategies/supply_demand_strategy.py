@@ -4,7 +4,6 @@ import numpy as np
 from ..core.market_analyzer import MarketCondition
 from .base_strategy import BaseStrategy
 import logging
-import talib
 
 logger = logging.getLogger(__name__)
 

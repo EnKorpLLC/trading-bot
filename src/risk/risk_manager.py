@@ -1,156 +1,244 @@
 from typing import Dict, List, Optional
-from decimal import Decimal
 import logging
+from datetime import datetime, timedelta
 from dataclasses import dataclass
-from ..core.interfaces import IRiskManager
-from ..utils.config_manager import ConfigManager
+from ..config.market_config import get_pair_settings
+import pandas as pd
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
 @dataclass
-class RiskLimits:
-    max_position_size: Decimal
-    max_daily_loss: Decimal
-    max_drawdown: Decimal
-    max_leverage: Decimal
-    position_limit: int
-    max_correlation: float
+class RiskParameters:
+    max_account_risk: float = 0.02  # Maximum risk per trade (2% of account)
+    max_daily_loss: float = 0.05    # Maximum daily loss (5% of account)
+    max_weekly_loss: float = 0.10   # Maximum weekly loss (10% of account)
+    max_drawdown: float = 0.20      # Maximum drawdown allowed (20% of account)
+    max_position_size: float = 0.10  # Maximum position size (10% of account)
+    max_correlated_pairs: int = 3    # Maximum number of correlated pairs to trade
+    min_risk_reward: float = 2.0     # Minimum risk/reward ratio
+    position_scaling: bool = True    # Whether to scale positions based on volatility
+    max_open_positions: int = 5      # Maximum number of open positions
+    max_daily_trades: int = 10       # Maximum number of trades per day
 
-class RiskManager(IRiskManager):
-    def __init__(self, config_manager: ConfigManager):
-        self.config = config_manager
-        self.risk_limits = self._load_risk_limits()
-        self.current_exposure = {}
-        self.daily_pnl = Decimal('0')
-        self.peak_balance = Decimal('0')
-        self.positions = {}
-        self.correlation_matrix = {}
+class PortfolioStats:
+    def __init__(self):
+        self.open_positions: Dict[str, Dict] = {}
+        self.daily_trades: List[Dict] = []
+        self.weekly_trades: List[Dict] = []
+        self.peak_balance: float = 0
+        self.current_balance: float = 0
+        self.daily_pnl: float = 0
+        self.weekly_pnl: float = 0
+        self.max_drawdown: float = 0
+        self.last_updated = datetime.now()
+
+class RiskManager:
+    def __init__(self, risk_params: Optional[RiskParameters] = None):
+        self.params = risk_params or RiskParameters()
+        self.portfolio = PortfolioStats()
+        self.correlation_matrix: Optional[pd.DataFrame] = None
+        self.volatility_data: Dict[str, float] = {}
         
-    def validate_trade(self, trade_request: Dict) -> bool:
+    def calculate_position_size(self, account_balance: float, entry_price: float,
+                              stop_loss: float, symbol: str) -> float:
+        """Calculate safe position size based on risk parameters."""
+        try:
+            # Get market settings for the symbol
+            market_settings = get_pair_settings(symbol)
+            
+            # Calculate risk amount in account currency
+            risk_amount = account_balance * self.params.max_account_risk
+            
+            # Calculate pip value and risk in pips
+            pip_value = market_settings['pip_value']
+            risk_pips = abs(entry_price - stop_loss) / pip_value
+            
+            if risk_pips == 0:
+                logger.error("Invalid risk pips calculation")
+                return 0
+                
+            # Calculate base position size
+            position_size = risk_amount / (risk_pips * pip_value)
+            
+            # Apply volatility scaling if enabled
+            if self.params.position_scaling and symbol in self.volatility_data:
+                volatility_factor = self._calculate_volatility_factor(symbol)
+                position_size *= volatility_factor
+            
+            # Apply position limits
+            max_size = account_balance * self.params.max_position_size
+            position_size = min(position_size, max_size)
+            
+            # Round to market's minimum lot size
+            min_lot = market_settings['min_lot_size']
+            position_size = round(position_size / min_lot) * min_lot
+            
+            return position_size
+            
+        except Exception as e:
+            logger.error(f"Error calculating position size: {str(e)}")
+            return 0
+            
+    def validate_trade(self, trade: Dict, account_balance: float) -> Dict:
         """Validate trade against risk parameters."""
         try:
-            # Check position size
-            if not self._validate_position_size(trade_request):
-                return False
-                
-            # Check leverage
-            if not self._validate_leverage(trade_request):
-                return False
-                
-            # Check correlation
-            if not self._validate_correlation(trade_request):
-                return False
-                
-            # Check position limits
-            if not self._validate_position_limits(trade_request):
-                return False
-                
-            # Check drawdown
-            if not self._validate_drawdown():
-                return False
-                
-            return True
+            symbol = trade['symbol']
+            entry = trade['entry_price']
+            stop_loss = trade['stop_loss']
+            take_profit = trade['take_profit']
+            
+            validation = {
+                'valid': True,
+                'messages': [],
+                'adjusted_trade': trade.copy()
+            }
+            
+            # Check daily loss limit
+            if self.portfolio.daily_pnl <= -(account_balance * self.params.max_daily_loss):
+                validation['valid'] = False
+                validation['messages'].append("Daily loss limit reached")
+                return validation
+            
+            # Check weekly loss limit
+            if self.portfolio.weekly_pnl <= -(account_balance * self.params.max_weekly_loss):
+                validation['valid'] = False
+                validation['messages'].append("Weekly loss limit reached")
+                return validation
+            
+            # Check drawdown limit
+            current_drawdown = (self.portfolio.peak_balance - account_balance) / self.portfolio.peak_balance
+            if current_drawdown >= self.params.max_drawdown:
+                validation['valid'] = False
+                validation['messages'].append("Maximum drawdown reached")
+                return validation
+            
+            # Check risk/reward ratio
+            risk = abs(entry - stop_loss)
+            reward = abs(entry - take_profit)
+            if (reward / risk) < self.params.min_risk_reward:
+                validation['valid'] = False
+                validation['messages'].append("Insufficient risk/reward ratio")
+                return validation
+            
+            # Check correlation limits
+            if not self._validate_correlation(symbol):
+                validation['valid'] = False
+                validation['messages'].append("Correlation limit reached for this pair")
+                return validation
+            
+            # Check maximum open positions
+            if len(self.portfolio.open_positions) >= self.params.max_open_positions:
+                validation['valid'] = False
+                validation['messages'].append("Maximum open positions reached")
+                return validation
+            
+            # Check daily trade limit
+            today_trades = len([t for t in self.portfolio.daily_trades 
+                              if t['timestamp'].date() == datetime.now().date()])
+            if today_trades >= self.params.max_daily_trades:
+                validation['valid'] = False
+                validation['messages'].append("Daily trade limit reached")
+                return validation
+            
+            return validation
             
         except Exception as e:
             logger.error(f"Error validating trade: {str(e)}")
-            return False
+            return {'valid': False, 'messages': [str(e)], 'adjusted_trade': trade}
             
-    def update_exposure(self, position: Dict):
-        """Update current exposure and risk metrics."""
+    def update_portfolio(self, trade_update: Dict):
+        """Update portfolio statistics with new trade information."""
         try:
-            symbol = position['symbol']
-            size = Decimal(str(position['size']))
+            symbol = trade_update['symbol']
             
-            # Update position tracking
-            if size == 0:
-                self.positions.pop(symbol, None)
-            else:
-                self.positions[symbol] = position
+            if trade_update['status'] == 'OPENED':
+                self.portfolio.open_positions[symbol] = trade_update
+                self.portfolio.daily_trades.append(trade_update)
+                self.portfolio.weekly_trades.append(trade_update)
                 
-            # Update exposure
-            self.current_exposure[symbol] = size
+            elif trade_update['status'] == 'CLOSED':
+                if symbol in self.portfolio.open_positions:
+                    del self.portfolio.open_positions[symbol]
+                
+                # Update P&L
+                pnl = trade_update.get('realized_pnl', 0)
+                self.portfolio.daily_pnl += pnl
+                self.portfolio.weekly_pnl += pnl
+                self.portfolio.current_balance += pnl
+                
+                # Update peak balance
+                if self.portfolio.current_balance > self.portfolio.peak_balance:
+                    self.portfolio.peak_balance = self.portfolio.current_balance
+                
+                # Update drawdown
+                current_drawdown = (self.portfolio.peak_balance - self.portfolio.current_balance) / self.portfolio.peak_balance
+                self.portfolio.max_drawdown = max(self.portfolio.max_drawdown, current_drawdown)
             
-            # Update daily P&L
-            self.daily_pnl += Decimal(str(position.get('realized_pnl', 0)))
-            
-            # Update peak balance
-            current_balance = Decimal(str(position.get('account_balance', 0)))
-            self.peak_balance = max(self.peak_balance, current_balance)
-            
-            # Update correlation matrix
-            self._update_correlation_matrix()
+            self._cleanup_historical_data()
             
         except Exception as e:
-            logger.error(f"Error updating exposure: {str(e)}")
+            logger.error(f"Error updating portfolio: {str(e)}")
             
-    def _validate_position_size(self, trade_request: Dict) -> bool:
-        """Validate position size against limits."""
-        size = Decimal(str(trade_request['size']))
-        symbol = trade_request['symbol']
-        
-        # Check absolute size
-        if size > self.risk_limits.max_position_size:
-            logger.warning(f"Position size {size} exceeds limit {self.risk_limits.max_position_size}")
-            return False
-            
-        # Check relative to account size
-        account_size = self._get_account_size()
-        if size / account_size > Decimal('0.1'):  # 10% max per position
-            logger.warning("Position size exceeds 10% of account size")
-            return False
-            
-        return True
-        
-    def _validate_leverage(self, trade_request: Dict) -> bool:
-        """Validate leverage against limits."""
-        leverage = self._calculate_leverage(trade_request)
-        if leverage > self.risk_limits.max_leverage:
-            logger.warning(f"Leverage {leverage} exceeds limit {self.risk_limits.max_leverage}")
-            return False
-        return True
-        
-    def _validate_correlation(self, trade_request: Dict) -> bool:
-        """Validate position correlation."""
-        symbol = trade_request['symbol']
-        
-        for existing_symbol, correlation in self.correlation_matrix.get(symbol, {}).items():
-            if (existing_symbol in self.positions and 
-                abs(correlation) > self.risk_limits.max_correlation):
-                logger.warning(f"High correlation between {symbol} and {existing_symbol}")
-                return False
-                
-        return True
-        
-    def _validate_position_limits(self, trade_request: Dict) -> bool:
-        """Validate number of open positions."""
-        if len(self.positions) >= self.risk_limits.position_limit:
-            logger.warning("Maximum number of positions reached")
-            return False
-        return True
-        
-    def _validate_drawdown(self) -> bool:
-        """Validate current drawdown."""
-        if self.peak_balance == 0:
+    def _validate_correlation(self, new_symbol: str) -> bool:
+        """Check if adding a new symbol would exceed correlation limits."""
+        if self.correlation_matrix is None or new_symbol not in self.correlation_matrix.index:
             return True
             
-        current_balance = self._get_account_size()
-        drawdown = (self.peak_balance - current_balance) / self.peak_balance
+        correlated_count = 0
+        for symbol in self.portfolio.open_positions:
+            if symbol in self.correlation_matrix.index:
+                correlation = abs(self.correlation_matrix.loc[new_symbol, symbol])
+                if correlation > 0.7:  # High correlation threshold
+                    correlated_count += 1
+                    
+        return correlated_count < self.params.max_correlated_pairs
         
-        if drawdown > self.risk_limits.max_drawdown:
-            logger.warning(f"Drawdown {drawdown} exceeds limit {self.risk_limits.max_drawdown}")
-            return False
+    def _calculate_volatility_factor(self, symbol: str) -> float:
+        """Calculate position scaling factor based on volatility."""
+        try:
+            current_volatility = self.volatility_data.get(symbol, 1.0)
+            avg_volatility = np.mean(list(self.volatility_data.values()))
             
-        return True
+            if avg_volatility == 0:
+                return 1.0
+                
+            # Scale between 0.5 and 1.5 based on relative volatility
+            factor = (current_volatility / avg_volatility)
+            return max(0.5, min(1.5, factor))
+            
+        except Exception as e:
+            logger.error(f"Error calculating volatility factor: {str(e)}")
+            return 1.0
+            
+    def _cleanup_historical_data(self):
+        """Clean up historical trade data."""
+        now = datetime.now()
         
-    def _load_risk_limits(self) -> RiskLimits:
-        """Load risk limits from configuration."""
-        risk_config = self.config.get_setting('risk_management', {})
+        # Clean up daily trades older than 1 day
+        self.portfolio.daily_trades = [
+            trade for trade in self.portfolio.daily_trades
+            if trade['timestamp'] > now - timedelta(days=1)
+        ]
         
-        return RiskLimits(
-            max_position_size=Decimal(str(risk_config.get('max_position_size', 0))),
-            max_daily_loss=Decimal(str(risk_config.get('max_daily_loss', 0))),
-            max_drawdown=Decimal(str(risk_config.get('max_drawdown', 0.1))),
-            max_leverage=Decimal(str(risk_config.get('max_leverage', 3))),
-            position_limit=int(risk_config.get('position_limit', 5)),
-            max_correlation=float(risk_config.get('max_correlation', 0.7))
-        ) 
+        # Clean up weekly trades older than 7 days
+        self.portfolio.weekly_trades = [
+            trade for trade in self.portfolio.weekly_trades
+            if trade['timestamp'] > now - timedelta(days=7)
+        ]
+        
+        # Reset daily P&L if it's a new day
+        if self.portfolio.last_updated.date() != now.date():
+            self.portfolio.daily_pnl = 0
+            
+        # Reset weekly P&L if it's a new week
+        if self.portfolio.last_updated.isocalendar()[1] != now.isocalendar()[1]:
+            self.portfolio.weekly_pnl = 0
+            
+        self.portfolio.last_updated = now
+        
+    def update_market_data(self, correlation_matrix: pd.DataFrame,
+                          volatility_data: Dict[str, float]):
+        """Update market data used for risk calculations."""
+        self.correlation_matrix = correlation_matrix
+        self.volatility_data = volatility_data 

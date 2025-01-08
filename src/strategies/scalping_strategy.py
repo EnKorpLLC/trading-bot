@@ -4,7 +4,27 @@ import numpy as np
 from ..core.market_analyzer import MarketCondition
 from .base_strategy import BaseStrategy
 import logging
-import talib
+
+# Custom indicator implementations
+def calculate_rsi(data: pd.Series, period: int = 14) -> pd.Series:
+    delta = data.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    return 100 - (100 / (1 + rs))
+
+def calculate_ema(data: pd.Series, period: int) -> pd.Series:
+    return data.ewm(span=period, adjust=False).mean()
+
+def calculate_sma(data: pd.Series, period: int) -> pd.Series:
+    return data.rolling(window=period).mean()
+
+def calculate_atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int) -> pd.Series:
+    tr1 = high - low
+    tr2 = abs(high - close.shift())
+    tr3 = abs(low - close.shift())
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    return tr.rolling(window=period).mean()
 
 logger = logging.getLogger(__name__)
 
@@ -61,18 +81,18 @@ class ScalpingStrategy(BaseStrategy):
     def _calculate_indicators(self, df: pd.DataFrame) -> Dict:
         """Calculate technical indicators for scalping."""
         # Calculate RSI
-        rsi = talib.RSI(df['close'], timeperiod=self.parameters['rsi_period'])
+        rsi = calculate_rsi(df['close'], period=self.parameters['rsi_period'])
         
         # Calculate EMAs
-        ema_fast = talib.EMA(df['close'], timeperiod=self.parameters['ema_fast'])
-        ema_slow = talib.EMA(df['close'], timeperiod=self.parameters['ema_slow'])
+        ema_fast = calculate_ema(df['close'], period=self.parameters['ema_fast'])
+        ema_slow = calculate_ema(df['close'], period=self.parameters['ema_slow'])
         
         # Calculate ATR
-        atr = talib.ATR(df['high'], df['low'], df['close'], 
-                       timeperiod=self.parameters['atr_period'])
+        atr = calculate_atr(df['high'], df['low'], df['close'], 
+                          period=self.parameters['atr_period'])
         
         # Calculate volume moving average
-        volume_ma = talib.SMA(df['volume'], timeperiod=20)
+        volume_ma = calculate_sma(df['volume'], period=20)
         
         return {
             'rsi': rsi,

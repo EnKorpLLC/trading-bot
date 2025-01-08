@@ -1,0 +1,32 @@
+{
+  "name": "trading-bot-frontend",
+  "version": "1.0.0",
+  "description": "Trading Bot Frontend Application",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^14.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@mui/material": "^5.15.3",
+    "@mui/icons-material": "^5.15.3",
+    "@emotion/react": "^11.11.3",
+    "@emotion/styled": "^11.11.0",
+    "axios": "^1.6.2",
+    "chart.js": "^4.4.1",
+    "react-chartjs-2": "^5.2.0",
+    "socket.io-client": "^4.7.2",
+    "@vercel/analytics": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/react": "^18.2.46",
+    "typescript": "^5.3.3",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "14.0.4"
+  }
+} 

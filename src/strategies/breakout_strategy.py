@@ -1,14 +1,27 @@
 from typing import Dict, Optional, List
 import pandas as pd
 import numpy as np
+from datetime import datetime
+import logging
+
 from ..core.market_analyzer import MarketCondition
 from .base_strategy import BaseStrategy
-import logging
-import talib
 
 logger = logging.getLogger(__name__)
 
+def calculate_atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
+    """Calculate Average True Range (ATR) without using talib."""
+    tr = pd.DataFrame()
+    tr['h-l'] = high - low
+    tr['h-pc'] = abs(high - close.shift(1))
+    tr['l-pc'] = abs(low - close.shift(1))
+    tr['tr'] = tr[['h-l', 'h-pc', 'l-pc']].max(axis=1)
+    atr = tr['tr'].rolling(period).mean()
+    return atr
+
 class BreakoutStrategy(BaseStrategy):
+    """Breakout trading strategy implementation."""
+    
     def __init__(self):
         super().__init__("Breakout Strategy")
         self.parameters = {
@@ -61,8 +74,8 @@ class BreakoutStrategy(BaseStrategy):
         lookback = self.parameters['lookback_period']
         
         # Calculate ATR for volatility context
-        atr = talib.ATR(df['high'], df['low'], df['close'], 
-                       timeperiod=self.parameters['atr_period'])
+        atr = calculate_atr(df['high'], df['low'], df['close'], 
+                          period=self.parameters['atr_period'])
         
         for i in range(lookback, len(df)):
             window = df.iloc[i-lookback:i]
@@ -103,7 +116,8 @@ class BreakoutStrategy(BaseStrategy):
                     'range_high': range_data['high'],
                     'range_low': range_data['low'],
                     'atr': range_data['atr'],
-                    'volume_increase': current_volume / range_data['volume_avg']
+                    'volume_increase': current_volume / range_data['volume_avg'],
+                    'timestamp': datetime.now()
                 })
                 
             # Check for downward breakout
@@ -115,7 +129,8 @@ class BreakoutStrategy(BaseStrategy):
                     'range_high': range_data['high'],
                     'range_low': range_data['low'],
                     'atr': range_data['atr'],
-                    'volume_increase': current_volume / range_data['volume_avg']
+                    'volume_increase': current_volume / range_data['volume_avg'],
+                    'timestamp': datetime.now()
                 })
                 
         return breakouts
@@ -153,7 +168,8 @@ class BreakoutStrategy(BaseStrategy):
             'entry_price': entry_price,
             'stop_loss': stop_loss,
             'take_profit': take_profit,
-            'reason': f"{breakout['type']} breakout with {breakout['volume_increase']:.1f}x volume"
+            'reason': f"{breakout['type']} breakout with {breakout['volume_increase']:.1f}x volume",
+            'timestamp': breakout['timestamp']
         }
         
     def _is_sideways(self, df: pd.DataFrame) -> bool:
@@ -167,5 +183,9 @@ class BreakoutStrategy(BaseStrategy):
         
     def _get_market_data(self, symbol: str) -> Optional[pd.DataFrame]:
         """Get market data for analysis."""
-        # TODO: Implement market data retrieval
-        return None 
+        try:
+            # TODO: Implement market data retrieval from data manager
+            return None
+        except Exception as e:
+            logger.error(f"Error getting market data for {symbol}: {str(e)}")
+            return None 

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Bot UI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .card {
+            margin: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .chart-container {
+            height: 400px;
+            margin: 20px 0;
+            position: relative;
+        }
+        .signal-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .signal-buy { color: #28a745; }
+        .signal-sell { color: #dc3545; }
+        .metrics-value {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .trade-profit { color: #28a745; }
+        .trade-loss { color: #dc3545; }
+        .strategy-card {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .strategy-card:hover {
+            transform: translateY(-5px);
+        }
+        .strategy-card.active {
+            border: 2px solid #0d6efd;
+        }
+        .chart-tools {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+        }
+        .drawing-tools {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+        }
+        .drawing-tools .btn {
+            display: block;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="status" class="alert alert-info m-3">
+        Loading... If you see this message, the page is working!
+    </div>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Trading Bot</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#strategyModal">Strategies</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#backtest">Backtest</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#optimize">Optimize</a>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center">
+                    <span id="tradeLockerStatus" class="badge bg-warning me-2">Not Connected</span>
+                    <button class="btn btn-outline-light me-2" data-bs-toggle="modal" data-bs-target="#tradeLockerModal">
+                        <i class="bi bi-box-arrow-in-right"></i> Trade Locker
+                    </button>
+                    <button class="btn btn-outline-light me-2" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                        <i class="bi bi-gear"></i> Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Strategy Selection Modal -->
+    <div class="modal fade" id="strategyModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Select Trading Strategy</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="card strategy-card" onclick="selectStrategy('fvg')">
+                                <div class="card-body">
+                                    <h5 class="card-title">Fair Value Gap</h5>
+                                    <p class="card-text">Trade price inefficiencies and market imbalances</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card strategy-card" onclick="selectStrategy('topdown')">
+                                <div class="card-body">
+                                    <h5 class="card-title">Top-Down Analysis</h5>
+                                    <p class="card-text">Multiple timeframe analysis for trend alignment</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card strategy-card" onclick="selectStrategy('consolidation')">
+                                <div class="card-body">
+                                    <h5 class="card-title">Consolidation</h5>
+                                    <p class="card-text">Trade range breakouts and market structure</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card strategy-card" onclick="selectStrategy('supply_demand')">
+                                <div class="card-body">
+                                    <h5 class="card-title">Supply & Demand</h5>
+                                    <p class="card-text">Trade key support and resistance zones</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card strategy-card" onclick="selectStrategy('scalping')">
+                                <div class="card-body">
+                                    <h5 class="card-title">Scalping</h5>
+                                    <p class="card-text">Quick entries and exits on lower timeframes</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card strategy-card" onclick="selectStrategy('fibonacci')">
+                                <div class="card-body">
+                                    <h5 class="card-title">Fibonacci</h5>
+                                    <p class="card-text">Trade using Fibonacci levels and zones</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card strategy-card" onclick="selectStrategy('opposition')">
+                                <div class="card-body">
+                                    <h5 class="card-title">Opposition</h5>
+                                    <p class="card-text">Trade opposite-colored candles in trends</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card strategy-card" onclick="selectStrategy('tetris')">
+                                <div class="card-body">
+                                    <h5 class="card-title">Tetris</h5>
+                                    <p class="card-text">Trade overlapping price structures</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card strategy-card" onclick="selectStrategy('liquidity')">
+                                <div class="card-body">
+                                    <h5 class="card-title">Liquidity</h5>
+                                    <p class="card-text">Trade liquidity pools and sweeps</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card strategy-card" onclick="selectStrategy('breakout')">
+                                <div class="card-body">
+                                    <h5 class="card-title">Breakout</h5>
+                                    <p class="card-text">Trade consolidation breakouts with volume</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card strategy-card" onclick="selectStrategy('independent')">
+                                <div class="card-body">
+                                    <h5 class="card-title">Independent Mode</h5>
+                                    <p class="card-text">Manual trading with all tools available</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="settingsForm">
+                        <div class="mb-3">
+                            <label class="form-label">Risk per Trade (%)</label>
+                            <input type="number" class="form-control" id="riskPerTrade" value="1">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Max Drawdown (%)</label>
+                            <input type="number" class="form-control" id="maxDrawdown" value="10">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Default Timeframe</label>
+                            <select class="form-select" id="defaultTimeframe">
+                                <option value="1h">1 Hour</option>
+                                <option value="4h">4 Hours</option>
+                                <option value="1d" selected>1 Day</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trade Locker Login Modal -->
+    <div class="modal fade" id="tradeLockerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Trade Locker Login</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="tradeLockerForm">
+                        <div class="mb-3">
+                            <label class="form-label">Server</label>
+                            <select class="form-select" id="tradeLockerServer" required>
+                                <option value="">Select Server</option>
+                                <!-- Add server options based on Trade Locker API docs -->
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" id="tradeLockerUsername" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" id="tradeLockerPassword" required>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="rememberLogin">
+                            <label class="form-check-label">Remember Login</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="connectTradeLocker()">Connect</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-md-9">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <select id="symbolSelector" class="form-select form-select-sm d-inline-block w-auto me-2">
+                                <option value="EURUSD">EUR/USD</option>
+                            </select>
+                            <span class="badge bg-primary ms-2" id="activeStrategy">No Strategy Selected</span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <div class="me-4">
+                                <small class="text-muted me-2">Bid:</small>
+                                <span id="bidPrice" class="text-danger">0.00000</span>
+                                <small class="text-muted mx-2">Ask:</small>
+                                <span id="askPrice" class="text-success">0.00000</span>
+                                <small class="text-muted mx-2">Spread:</small>
+                                <span id="spread">0.0 pips</span>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-primary" onclick="updateTimeframe('1h')">1H</button>
+                                <button class="btn btn-sm btn-outline-primary" onclick="updateTimeframe('4h')">4H</button>
+                                <button class="btn btn-sm btn-outline-primary" onclick="updateTimeframe('1d')">1D</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body position-relative">
+                        <div class="chart-tools btn-group">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="toggleIndicator('sma')" 
+                                data-bs-toggle="tooltip" data-bs-placement="bottom" 
+                                title="Simple Moving Average - Shows the average price over a period of time, helping identify trends. Higher values (e.g., 200) for long-term trends, lower values (e.g., 20) for short-term trends.">
+                                SMA
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="toggleIndicator('ema')"
+                                data-bs-toggle="tooltip" data-bs-placement="bottom" 
+                                title="Exponential Moving Average - Similar to SMA but gives more weight to recent prices. Responds faster to price changes than SMA. Used for trend following and support/resistance.">
+                                EMA
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="toggleIndicator('rsi')"
+                                data-bs-toggle="tooltip" data-bs-placement="bottom" 
+                                title="Relative Strength Index - Momentum indicator that measures the speed and magnitude of price changes. Values range 0-100. Above 70 typically indicates overbought, below 30 indicates oversold.">
+                                RSI
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="toggleIndicator('macd')"
+                                data-bs-toggle="tooltip" data-bs-placement="bottom" 
+                                title="Moving Average Convergence Divergence - Trend-following momentum indicator showing relationship between two moving averages. Signal line crossovers, divergences, and centerline crossovers are key signals.">
+                                MACD
+                            </button>
+                        </div>
+                        <div class="drawing-tools">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="setDrawingMode('line')">
+                                <i class="bi bi-slash-lg"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="setDrawingMode('rectangle')">
+                                <i class="bi bi-square"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="setDrawingMode('fibonacci')">
+                                <i class="bi bi-diagram-3"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearDrawings()">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="priceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <!-- Account Information Card -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Account Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6 mb-2">
+                                <small class="text-muted">Balance</small>
+                                <div id="accountBalance" class="metrics-value">0.00</div>
+                            </div>
+                            <div class="col-6 mb-2">
+                                <small class="text-muted">Equity</small>
+                                <div id="accountEquity" class="metrics-value">0.00</div>
+                            </div>
+                            <div class="col-6 mb-2">
+                                <small class="text-muted">Margin</small>
+                                <div id="accountMargin" class="metrics-value">0.00</div>
+                            </div>
+                            <div class="col-6 mb-2">
+                                <small class="text-muted">Free Margin</small>
+                                <div id="accountFreeMargin" class="metrics-value">0.00</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Leverage</small>
+                                <div id="accountLeverage" class="metrics-value">1:100</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Trading Signals Card -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Trading Signals</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group" id="signals"></div>
+                    </div>
+                </div>
+                <!-- Performance Metrics Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Performance Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <div class="metric-item">
+                                    <small class="text-muted">Total Return</small>
+                                    <div id="totalReturn" class="metrics-value">0.00%</div>
+                                </div>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <div class="metric-item">
+                                    <small class="text-muted">Sharpe Ratio</small>
+                                    <div id="sharpeRatio" class="metrics-value">0.00</div>
+                                </div>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <div class="metric-item">
+                                    <small class="text-muted">Max Drawdown</small>
+                                    <div id="maxDrawdown" class="metrics-value">0.00%</div>
+                                </div>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <div class="metric-item">
+                                    <small class="text-muted">Win Rate</small>
+                                    <div id="winRate" class="metrics-value">0.00%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Recent Trades</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Type</th>
+                                        <th>Price</th>
+                                        <th>Size</th>
+                                        <th>P/L</th>
+                                        <th>Strategy</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trades"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+    <script src="app.js"></script>
+</body>
+</html> 

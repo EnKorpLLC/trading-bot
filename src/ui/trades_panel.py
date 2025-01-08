@@ -1,117 +1,411 @@
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QHBoxLayout, QLabel, QHeaderView
-)
-from PyQt6.QtCore import Qt
+from typing import Dict, List, Optional
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+    QTableWidget, QTableWidgetItem, QHeaderView,
+    QTabWidget, QMenu, QMessageBox, QLabel,
+    QComboBox
+)
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QAction
 
 logger = logging.getLogger(__name__)
 
 class TradesPanel(QWidget):
-    def __init__(self, trading_engine):
+    """Widget for displaying and managing positions and trades."""
+    
+    # Signals
+    positionClosed = pyqtSignal(str)  # Position ID
+    
+    def __init__(self):
         super().__init__()
-        self.trading_engine = trading_engine
-        self.init_ui()
+        self.positions: Dict[str, Dict] = {}  # Position ID -> Position details
+        self.trades: List[Dict] = []  # List of completed trades
+        self._init_ui()
         
-    def init_ui(self):
-        """Initialize the trades panel UI."""
+    def _init_ui(self):
+        """Initialize the UI."""
         layout = QVBoxLayout(self)
         
-        # Create header with summary
-        header = QHBoxLayout()
-        self.total_trades_label = QLabel("Total Trades: 0")
-        self.active_trades_label = QLabel("Active Trades: 0")
-        self.total_profit_label = QLabel("Total Profit: $0.00")
+        # Create tab widget
+        tabs = QTabWidget()
         
-        header.addWidget(self.total_trades_label)
-        header.addWidget(self.active_trades_label)
-        header.addWidget(self.total_profit_label)
-        header.addStretch()
+        # Positions tab
+        positions_tab = QWidget()
+        positions_layout = QVBoxLayout(positions_tab)
         
-        # Add close all trades button
-        close_all_btn = QPushButton("Close All Trades")
-        close_all_btn.clicked.connect(self.close_all_trades)
-        header.addWidget(close_all_btn)
+        # Positions toolbar
+        positions_toolbar = QHBoxLayout()
         
-        layout.addLayout(header)
+        close_all_btn = QPushButton("Close All")
+        close_all_btn.clicked.connect(self._close_all_positions)
+        positions_toolbar.addWidget(close_all_btn)
         
-        # Create trades table
-        self.trades_table = QTableWidget()
-        self.trades_table.setColumnCount(8)
-        self.trades_table.setHorizontalHeaderLabels([
-            "ID", "Strategy", "Symbol", "Type", "Entry Price",
-            "Current Price", "Profit/Loss", "Actions"
+        positions_toolbar.addStretch()
+        
+        # Total P&L display
+        self.total_pnl_label = QLabel("Total P&L: $0.00")
+        positions_toolbar.addWidget(self.total_pnl_label)
+        
+        positions_layout.addLayout(positions_toolbar)
+        
+        # Positions table
+        self.positions_table = QTableWidget()
+        self.positions_table.setColumnCount(8)
+        self.positions_table.setHorizontalHeaderLabels([
+            "Symbol",
+            "Side",
+            "Size",
+            "Entry",
+            "Current",
+            "P&L",
+            "P&L %",
+            "Duration"
         ])
         
-        # Set column stretching
+        # Set column resize modes
+        header = self.positions_table.horizontalHeader()
+        for i in range(8):
+            header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
+            
+        # Enable context menu
+        self.positions_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.positions_table.customContextMenuRequested.connect(self._show_position_menu)
+        
+        positions_layout.addWidget(self.positions_table)
+        
+        tabs.addTab(positions_tab, "Positions")
+        
+        # Trades tab
+        trades_tab = QWidget()
+        trades_layout = QVBoxLayout(trades_tab)
+        
+        # Trades toolbar
+        trades_toolbar = QHBoxLayout()
+        
+        trades_toolbar.addWidget(QLabel("Symbol:"))
+        self.symbol_filter = QComboBox()
+        trades_toolbar.addWidget(self.symbol_filter)
+        
+        trades_toolbar.addWidget(QLabel("Period:"))
+        self.period_filter = QComboBox()
+        self.period_filter.addItems(["All", "Today", "This Week", "This Month", "Custom"])
+        trades_toolbar.addWidget(self.period_filter)
+        
+        trades_toolbar.addStretch()
+        
+        trades_layout.addLayout(trades_toolbar)
+        
+        # Trades table
+        self.trades_table = QTableWidget()
+        self.trades_table.setColumnCount(9)
+        self.trades_table.setHorizontalHeaderLabels([
+            "Time",
+            "Symbol",
+            "Side",
+            "Size",
+            "Entry",
+            "Exit",
+            "P&L",
+            "P&L %",
+            "Duration"
+        ])
+        
+        # Set column resize modes
         header = self.trades_table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        
-        layout.addWidget(self.trades_table)
-        
-    def update_display(self):
-        """Update the trades display."""
-        active_trades = self.trading_engine.active_trades
-        self.trades_table.setRowCount(len(active_trades))
-        
-        total_profit = 0.0
-        
-        for row, (trade_id, trade) in enumerate(active_trades.items()):
-            # Add trade details to table
-            self.trades_table.setItem(row, 0, QTableWidgetItem(trade_id))
-            self.trades_table.setItem(row, 1, QTableWidgetItem(trade['signal']['strategy']))
-            self.trades_table.setItem(row, 2, QTableWidgetItem(trade['signal']['signal']['symbol']))
-            self.trades_table.setItem(row, 3, QTableWidgetItem(trade['signal']['signal']['side']))
-            self.trades_table.setItem(row, 4, QTableWidgetItem(f"${trade['signal']['signal']['entry_price']:.2f}"))
+        for i in range(9):
+            header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
             
-            # Calculate current profit/loss
-            current_price = self.get_current_price(trade['signal']['signal']['symbol'])
-            profit = self.calculate_profit(trade, current_price)
-            total_profit += profit
-            
-            self.trades_table.setItem(row, 5, QTableWidgetItem(f"${current_price:.2f}"))
-            self.trades_table.setItem(row, 6, QTableWidgetItem(f"${profit:.2f}"))
-            
-            # Add close button
-            close_button = QPushButton("Close")
-            close_button.clicked.connect(lambda checked, tid=trade_id: self.close_trade(tid))
-            self.trades_table.setCellWidget(row, 7, close_button)
-            
-        # Update summary labels
-        self.total_trades_label.setText(f"Total Trades: {self.trading_engine.strategy_manager.get_total_trades()}")
-        self.active_trades_label.setText(f"Active Trades: {len(active_trades)}")
-        self.total_profit_label.setText(f"Total Profit: ${total_profit:.2f}")
+        trades_layout.addWidget(self.trades_table)
         
-    def close_trade(self, trade_id: str):
-        """Close a specific trade."""
+        tabs.addTab(trades_tab, "Trades")
+        
+        layout.addWidget(tabs)
+        
+    def update_position(self, position_id: str, position: Dict):
+        """Update position details."""
         try:
-            self.trading_engine.close_trade(trade_id)
-            logger.info(f"Closed trade: {trade_id}")
-        except Exception as e:
-            logger.error(f"Error closing trade {trade_id}: {str(e)}")
+            self.positions[position_id] = position
+            self._update_positions_table()
+            self._update_total_pnl()
             
-    def close_all_trades(self):
-        """Close all active trades."""
+        except Exception as e:
+            logger.error(f"Error updating position: {str(e)}")
+            
+    def remove_position(self, position_id: str):
+        """Remove position from display."""
         try:
-            for trade_id in list(self.trading_engine.active_trades.keys()):
-                self.close_trade(trade_id)
-            logger.info("Closed all trades")
+            if position_id in self.positions:
+                del self.positions[position_id]
+                self._update_positions_table()
+                self._update_total_pnl()
+                
         except Exception as e:
-            logger.error(f"Error closing all trades: {str(e)}")
+            logger.error(f"Error removing position: {str(e)}")
             
-    def get_current_price(self, symbol: str) -> float:
-        """Get current price for a symbol."""
-        # TODO: Implement real price fetching
-        return 0.0
-        
-    def calculate_profit(self, trade: dict, current_price: float) -> float:
-        """Calculate current profit/loss for a trade."""
-        entry_price = float(trade['signal']['signal']['entry_price'])
-        position_size = float(trade['position_size'])
-        side = trade['signal']['signal']['side']
-        
-        if side.lower() == 'buy':
-            return (current_price - entry_price) * position_size
-        else:
-            return (entry_price - current_price) * position_size 
+    def add_trade(self, trade: Dict):
+        """Add completed trade to history."""
+        try:
+            self.trades.append(trade)
+            self._update_trades_table()
+            
+            # Update symbol filter if needed
+            symbol = trade['symbol']
+            if symbol not in [self.symbol_filter.itemText(i) for i in range(self.symbol_filter.count())]:
+                self.symbol_filter.addItem(symbol)
+                
+        except Exception as e:
+            logger.error(f"Error adding trade: {str(e)}")
+            
+    def clear(self):
+        """Clear all positions and trades."""
+        try:
+            self.positions.clear()
+            self.trades.clear()
+            self._update_positions_table()
+            self._update_trades_table()
+            self._update_total_pnl()
+            
+        except Exception as e:
+            logger.error(f"Error clearing trades panel: {str(e)}")
+            
+    def _update_positions_table(self):
+        """Update positions table display."""
+        try:
+            self.positions_table.setRowCount(len(self.positions))
+            
+            for i, (position_id, position) in enumerate(self.positions.items()):
+                # Symbol
+                self.positions_table.setItem(i, 0, QTableWidgetItem(position['symbol']))
+                
+                # Side
+                side_item = QTableWidgetItem(position['side'])
+                if position['side'] == "Long":
+                    side_item.setBackground(QColor(200, 255, 200))
+                else:
+                    side_item.setBackground(QColor(255, 200, 200))
+                self.positions_table.setItem(i, 1, side_item)
+                
+                # Size
+                size_item = QTableWidgetItem(f"{position['size']:.2f}")
+                size_item.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+                self.positions_table.setItem(i, 2, size_item)
+                
+                # Entry price
+                entry_item = QTableWidgetItem(f"{position['entry_price']:.5f}")
+                entry_item.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+                self.positions_table.setItem(i, 3, entry_item)
+                
+                # Current price
+                current_item = QTableWidgetItem(f"{position['current_price']:.5f}")
+                current_item.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+                self.positions_table.setItem(i, 4, current_item)
+                
+                # P&L
+                pnl = position['unrealized_pnl']
+                pnl_item = QTableWidgetItem(f"${pnl:.2f}")
+                pnl_item.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+                if pnl > 0:
+                    pnl_item.setBackground(QColor(200, 255, 200))
+                elif pnl < 0:
+                    pnl_item.setBackground(QColor(255, 200, 200))
+                self.positions_table.setItem(i, 5, pnl_item)
+                
+                # P&L %
+                pnl_pct = position['unrealized_pnl_pct']
+                pnl_pct_item = QTableWidgetItem(f"{pnl_pct:.2f}%")
+                pnl_pct_item.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+                if pnl_pct > 0:
+                    pnl_pct_item.setBackground(QColor(200, 255, 200))
+                elif pnl_pct < 0:
+                    pnl_pct_item.setBackground(QColor(255, 200, 200))
+                self.positions_table.setItem(i, 6, pnl_pct_item)
+                
+                # Duration
+                duration = datetime.now() - position['open_time']
+                duration_str = str(duration).split('.')[0]  # Remove microseconds
+                self.positions_table.setItem(i, 7, QTableWidgetItem(duration_str))
+                
+                # Store position ID as item data
+                for col in range(8):
+                    self.positions_table.item(i, col).setData(Qt.ItemDataRole.UserRole, position_id)
+                    
+        except Exception as e:
+            logger.error(f"Error updating positions table: {str(e)}")
+            
+    def _update_trades_table(self):
+        """Update trades table display."""
+        try:
+            # Apply filters
+            filtered_trades = self.trades
+            
+            # Symbol filter
+            symbol = self.symbol_filter.currentText()
+            if symbol and symbol != "All":
+                filtered_trades = [t for t in filtered_trades if t['symbol'] == symbol]
+                
+            # Period filter
+            period = self.period_filter.currentText()
+            if period != "All":
+                now = datetime.now()
+                if period == "Today":
+                    filtered_trades = [
+                        t for t in filtered_trades
+                        if t['close_time'].date() == now.date()
+                    ]
+                elif period == "This Week":
+                    start_of_week = now.date() - timedelta(days=now.weekday())
+                    filtered_trades = [
+                        t for t in filtered_trades
+                        if t['close_time'].date() >= start_of_week
+                    ]
+                elif period == "This Month":
+                    start_of_month = now.date().replace(day=1)
+                    filtered_trades = [
+                        t for t in filtered_trades
+                        if t['close_time'].date() >= start_of_month
+                    ]
+                    
+            # Update table
+            self.trades_table.setRowCount(len(filtered_trades))
+            
+            for i, trade in enumerate(filtered_trades):
+                # Time
+                time_item = QTableWidgetItem(
+                    trade['close_time'].strftime("%Y-%m-%d %H:%M:%S")
+                )
+                self.trades_table.setItem(i, 0, time_item)
+                
+                # Symbol
+                self.trades_table.setItem(i, 1, QTableWidgetItem(trade['symbol']))
+                
+                # Side
+                side_item = QTableWidgetItem(trade['side'])
+                if trade['side'] == "Long":
+                    side_item.setBackground(QColor(200, 255, 200))
+                else:
+                    side_item.setBackground(QColor(255, 200, 200))
+                self.trades_table.setItem(i, 2, side_item)
+                
+                # Size
+                size_item = QTableWidgetItem(f"{trade['size']:.2f}")
+                size_item.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+                self.trades_table.setItem(i, 3, size_item)
+                
+                # Entry price
+                entry_item = QTableWidgetItem(f"{trade['entry_price']:.5f}")
+                entry_item.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+                self.trades_table.setItem(i, 4, entry_item)
+                
+                # Exit price
+                exit_item = QTableWidgetItem(f"{trade['exit_price']:.5f}")
+                exit_item.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+                self.trades_table.setItem(i, 5, exit_item)
+                
+                # P&L
+                pnl = trade['realized_pnl']
+                pnl_item = QTableWidgetItem(f"${pnl:.2f}")
+                pnl_item.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+                if pnl > 0:
+                    pnl_item.setBackground(QColor(200, 255, 200))
+                elif pnl < 0:
+                    pnl_item.setBackground(QColor(255, 200, 200))
+                self.trades_table.setItem(i, 6, pnl_item)
+                
+                # P&L %
+                pnl_pct = trade['realized_pnl_pct']
+                pnl_pct_item = QTableWidgetItem(f"{pnl_pct:.2f}%")
+                pnl_pct_item.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+                if pnl_pct > 0:
+                    pnl_pct_item.setBackground(QColor(200, 255, 200))
+                elif pnl_pct < 0:
+                    pnl_pct_item.setBackground(QColor(255, 200, 200))
+                self.trades_table.setItem(i, 7, pnl_pct_item)
+                
+                # Duration
+                duration = trade['close_time'] - trade['open_time']
+                duration_str = str(duration).split('.')[0]  # Remove microseconds
+                self.trades_table.setItem(i, 8, QTableWidgetItem(duration_str))
+                
+        except Exception as e:
+            logger.error(f"Error updating trades table: {str(e)}")
+            
+    def _update_total_pnl(self):
+        """Update total P&L display."""
+        try:
+            total_pnl = sum(p['unrealized_pnl'] for p in self.positions.values())
+            self.total_pnl_label.setText(f"Total P&L: ${total_pnl:,.2f}")
+            
+            # Set color based on P&L
+            if total_pnl > 0:
+                self.total_pnl_label.setStyleSheet("color: green;")
+            elif total_pnl < 0:
+                self.total_pnl_label.setStyleSheet("color: red;")
+            else:
+                self.total_pnl_label.setStyleSheet("")
+                
+        except Exception as e:
+            logger.error(f"Error updating total P&L: {str(e)}")
+            
+    def _show_position_menu(self, position):
+        """Show context menu for positions table."""
+        try:
+            row = self.positions_table.rowAt(position.y())
+            if row >= 0:
+                position_id = self.positions_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+                
+                menu = QMenu(self)
+                
+                # Close position action
+                close_action = QAction("Close Position", self)
+                close_action.triggered.connect(lambda: self._close_position(position_id))
+                menu.addAction(close_action)
+                
+                menu.exec(self.positions_table.mapToGlobal(position))
+                
+        except Exception as e:
+            logger.error(f"Error showing position menu: {str(e)}")
+            
+    def _close_position(self, position_id: str):
+        """Close selected position."""
+        try:
+            reply = QMessageBox.question(
+                self,
+                "Close Position",
+                "Are you sure you want to close this position?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                self.positionClosed.emit(position_id)
+                
+        except Exception as e:
+            logger.error(f"Error closing position: {str(e)}")
+            
+    def _close_all_positions(self):
+        """Close all open positions."""
+        try:
+            if not self.positions:
+                QMessageBox.information(
+                    self,
+                    "Close All Positions",
+                    "No open positions to close."
+                )
+                return
+                
+            reply = QMessageBox.question(
+                self,
+                "Close All Positions",
+                f"Are you sure you want to close {len(self.positions)} open positions?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                for position_id in list(self.positions.keys()):
+                    self.positionClosed.emit(position_id)
+                    
+        except Exception as e:
+            logger.error(f"Error closing all positions: {str(e)}") 
