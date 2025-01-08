@@ -1,16 +1,8 @@
-import { Box, Container, Typography } from '@mui/material';
-
 export default function Home() {
   return (
-    <Container maxWidth="xl">
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h2" component="h1" gutterBottom>
-          Trading Bot Platform
-        </Typography>
-        <Typography variant="h5" component="h2" gutterBottom>
-          AI-powered Forex trading with TradeLocker integration
-        </Typography>
-      </Box>
-    </Container>
-  );
+    <main className="flex min-h-screen flex-col items-center justify-between p-24">
+      <h1>Trading Bot</h1>
+      <p>Welcome to our trading platform</p>
+    </main>
+  )
 } 
