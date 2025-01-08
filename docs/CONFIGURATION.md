@@ -1,203 +1,132 @@
 # Configuration Management
 
 ## Environment Variables
-
-### Core Configuration
+### Development
 ```env
-NODE_ENV=development|production
-PORT=3000
-HOST=localhost
+NODE_ENV=development
+NEXT_PUBLIC_API_URL=http://localhost:3000
+NEXT_PUBLIC_WS_URL=ws://localhost:3001
+DATABASE_URL=postgresql://localhost:5432/trading_bot
 ```
 
-### Database Configuration
+### Production
 ```env
-DATABASE_URL=postgres://user:password@neon.tech:5432/dbname
-DATABASE_SSL=true
-DATABASE_MAX_CONNECTIONS=20
-DATABASE_IDLE_TIMEOUT=10000
+NODE_ENV=production
+NEXT_PUBLIC_API_URL=https://api.tradingbot.com
+NEXT_PUBLIC_WS_URL=wss://ws.tradingbot.com
+DATABASE_URL=your_neon_connection_string
 ```
 
-### TradeLocker API
-```env
-TRADELOCKER_API_URL=https://api.tradelocker.com
-TRADELOCKER_WS_URL=wss://stream.tradelocker.com
-TRADELOCKER_API_KEY=your_api_key
-TRADELOCKER_API_SECRET=your_api_secret
-```
-
-### Technical Analysis
-```env
-# Custom indicator settings
-INDICATOR_UPDATE_INTERVAL=1000
-INDICATOR_HISTORY_SIZE=100
-VOLATILITY_WINDOW=14
-VOLUME_MA_PERIOD=20
-```
-
-### Authentication
-```env
-JWT_SECRET=your_jwt_secret
-JWT_EXPIRY=24h
-REFRESH_TOKEN_EXPIRY=7d
-SESSION_SECRET=your_session_secret
-```
-
-### Security
-```env
-CORS_ORIGIN=https://yourdomain.com
-RATE_LIMIT_WINDOW=15m
-RATE_LIMIT_MAX=100
-TLS_KEY_PATH=/path/to/key.pem
-TLS_CERT_PATH=/path/to/cert.pem
-```
-
-### AI System
-```env
-AI_MODEL_PATH=/path/to/models
-AI_UPDATE_INTERVAL=24h
-AI_CONFIDENCE_THRESHOLD=0.75
-MAX_PARALLEL_STRATEGIES=5
-```
-
-## Configuration Files
-
-### Next.js Configuration
+## Next.js Configuration
 ```javascript
 // next.config.js
 module.exports = {
-  env: {
-    API_URL: process.env.API_URL,
-  },
-  webpack: (config, { isServer }) => {
-    // Custom webpack configuration
-    return config
-  },
+  reactStrictMode: true,
+  swcMinify: true,
+  poweredByHeader: false,
+  typescript: {
+    ignoreBuildErrors: false
+  }
 }
 ```
 
-### TypeScript Configuration
+## TypeScript Configuration
 ```json
 // tsconfig.json
 {
   "compilerOptions": {
     "target": "es5",
     "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
     "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true
-  },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"]
-}
-```
-
-## Development Environments
-
-### Local Development
-```env
-NODE_ENV=development
-API_URL=http://localhost:3000
-WS_URL=ws://localhost:3001
-DATABASE_URL=postgres://localhost:5432/tradingbot_dev
-```
-
-### Staging Environment
-```env
-NODE_ENV=staging
-API_URL=https://staging-api.tradingbot.com
-WS_URL=wss://staging-ws.tradingbot.com
-DATABASE_URL=postgres://staging.neon.tech/tradingbot_staging
-```
-
-### Production Environment
-```env
-NODE_ENV=production
-API_URL=https://api.tradingbot.com
-WS_URL=wss://ws.tradingbot.com
-DATABASE_URL=postgres://prod.neon.tech/tradingbot_prod
-```
-
-## Deployment Configuration
-
-### Vercel Configuration
-```json
-{
-  "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
-  "env": {
-    "NODE_ENV": "production",
-    "DATABASE_URL": "@database_url"
   }
 }
 ```
 
-### Docker Configuration
-```dockerfile
-# Dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-EXPOSE 3000
-CMD ["npm", "start"]
+## NPM Configuration
+```
+// .npmrc
+legacy-peer-deps=true
+engine-strict=true
 ```
 
-## Security Configurations
+## Git Configuration
+```gitignore
+# Dependencies
+node_modules
+.pnp
+.yarn
 
-### CORS Configuration
-```javascript
-const corsOptions = {
-  origin: process.env.CORS_ORIGIN,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-};
+# Build
+.next
+out
+build
+dist
+
+# Environment
+.env*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
 ```
 
-### Rate Limiting
-```javascript
-const rateLimitConfig = {
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-};
+## Vercel Configuration
+- Root Directory: frontend
+- Framework: Next.js
+- Build Command: next build
+- Install Command: npm install
+- Output Directory: .next
+
+## Database Configuration
+### Neon Setup (Pending)
+- Instance Type: Serverless
+- Region: Auto-select
+- Compute: Shared
+- Storage: Auto-scaling
+
+### Connection Pool
+```typescript
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production'
+});
 ```
 
-## Monitoring Configuration
+## Security Configuration
+- CORS Settings
+- Rate Limiting
+- Authentication
+- Input Validation
 
-### Logging
-```javascript
-const loggingConfig = {
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.json(),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'combined.log' })
-  ]
-};
+## Build Process
+1. Install dependencies
+2. Type checking
+3. Linting
+4. Building
+5. Testing
+6. Deployment
+
+## Development Tools
+- Node.js >= 18.0.0
+- npm or yarn
+- Git
+- VS Code recommended
+
+## VS Code Settings
+```json
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  }
+}
 ```
 
-### Performance Monitoring
-```javascript
-const performanceConfig = {
-  metricsInterval: 60000, // 1 minute
-  histogramBuckets: [0.1, 0.5, 1, 2, 5],
-  defaultLabels: { service: 'trading-bot' }
-};
-``` 
+## Monitoring Setup (Planned)
+- Error tracking
+- Performance monitoring
+- Usage analytics
+- Status reporting 

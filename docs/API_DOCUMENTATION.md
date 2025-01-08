@@ -1,135 +1,142 @@
 # API Documentation
 
-## Overview
-This document details the API structure for the Trading Bot platform, including both TradeLocker integration and internal APIs.
+## Database Configuration
+- Platform: Neon (Serverless PostgreSQL)
+- Connection: Environment variable based
+- Status: Pending setup
 
-## TradeLocker Integration API
+## Environment Variables
+```env
+# Database
+DATABASE_URL=postgresql://user:password@host:port/database
 
-### Authentication
-```typescript
-POST /api/auth/login
-{
-    "email": string,
-    "password": string,
-    "server": string
-}
+# API Endpoints
+NEXT_PUBLIC_API_URL=https://api.example.com
+NEXT_PUBLIC_WS_URL=wss://ws.example.com
+
+# Authentication
+JWT_SECRET=your-secret-key
 ```
 
-### Market Data
-```typescript
-GET /api/market/quotes
-GET /api/market/depth
-GET /api/market/history
-WebSocket: ws://api/market/stream
-```
+## API Endpoints (Planned)
+1. Authentication
+   ```
+   POST /api/auth/login
+   POST /api/auth/register
+   POST /api/auth/logout
+   ```
 
-### Trading Operations
-```typescript
-POST /api/trade/order
-GET /api/trade/orders
-PUT /api/trade/order/{id}
-DELETE /api/trade/order/{id}
-GET /api/trade/positions
-```
+2. Trading
+   ```
+   GET /api/trading/status
+   POST /api/trading/execute
+   GET /api/trading/history
+   ```
 
-### Account Management
-```typescript
-GET /api/account/info
-GET /api/account/balance
-GET /api/account/history
-```
+3. User Management
+   ```
+   GET /api/user/profile
+   PUT /api/user/settings
+   GET /api/user/activity
+   ```
 
-## Internal APIs
-
-### AI Trading System
-```typescript
-POST /api/ai/analyze
-POST /api/ai/strategy/select
-POST /api/ai/trade/approve
-GET /api/ai/performance
-```
-
-### Risk Management
-```typescript
-POST /api/risk/validate
-GET /api/risk/limits
-PUT /api/risk/settings
-GET /api/risk/analysis
-```
-
-### System Management
-```typescript
-GET /api/system/status
-GET /api/system/performance
-POST /api/system/config
-```
+4. Market Data
+   ```
+   GET /api/market/prices
+   GET /api/market/indicators
+   GET /api/market/analysis
+   ```
 
 ## WebSocket Events
+1. Market Updates
+   ```
+   market:price
+   market:indicator
+   market:alert
+   ```
 
-### Market Data
-```typescript
-{
-    type: "MARKET_UPDATE",
-    data: {
-        symbol: string,
-        bid: number,
-        ask: number,
-        timestamp: number
-    }
-}
-```
+2. Trading Events
+   ```
+   trade:executed
+   trade:pending
+   trade:cancelled
+   ```
 
-### Trading Updates
-```typescript
-{
-    type: "TRADE_UPDATE",
-    data: {
-        orderId: string,
-        status: string,
-        fillPrice?: number,
-        timestamp: number
-    }
-}
-```
+3. System Events
+   ```
+   system:status
+   system:error
+   system:maintenance
+   ```
 
-### AI System Events
+## Error Handling
 ```typescript
-{
-    type: "AI_DECISION",
-    data: {
-        strategy: string,
-        action: string,
-        confidence: number,
-        analysis: object
-    }
+interface ApiError {
+  code: number;
+  message: string;
+  details?: any;
 }
 ```
 
 ## Rate Limiting
-- Market Data: 100 requests per minute
-- Trading Operations: 50 requests per minute
-- Account Operations: 30 requests per minute
-- AI Operations: 20 requests per minute
-
-## Error Handling
-```typescript
-{
-    "error": {
-        "code": string,
-        "message": string,
-        "details": object
-    }
-}
-```
-
-## Authentication
-- JWT-based authentication
-- Token refresh mechanism
-- Session management
-- API key support for automated trading
+- Standard: 100 requests per minute
+- WebSocket: 10 connections per user
+- Database: Connection pooling configured
 
 ## Security
-- TLS encryption required
-- API key rotation policy
-- IP whitelisting support
-- Request signing for sensitive operations 
+- JWT Authentication
+- HTTPS Only
+- CORS Configuration
+- Rate Limiting
+- Input Validation
+
+## Database Schema (Planned)
+```sql
+-- Users
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Trading History
+CREATE TABLE trades (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  symbol VARCHAR(10) NOT NULL,
+  type VARCHAR(4) NOT NULL,
+  amount DECIMAL NOT NULL,
+  price DECIMAL NOT NULL,
+  status VARCHAR(10) NOT NULL,
+  executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Settings
+CREATE TABLE user_settings (
+  user_id INTEGER REFERENCES users(id),
+  setting_key VARCHAR(50) NOT NULL,
+  setting_value JSON NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, setting_key)
+);
+```
+
+## Next Steps
+1. Database Setup
+   - Initialize Neon instance
+   - Configure connection pooling
+   - Set up migrations
+   - Create initial schemas
+
+2. API Implementation
+   - Set up Next.js API routes
+   - Implement authentication
+   - Add WebSocket support
+   - Configure error handling
+
+3. Testing
+   - Unit tests for API routes
+   - Integration tests
+   - Load testing
+   - Security testing 
