@@ -1,20 +1,4 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
-  "env": {
-    "NODE_ENV": "production",
-    "API_URL": "https://api.tradingbot.com",
-    "WS_URL": "wss://ws.tradingbot.com"
-  },
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/"
-    }
-  ]
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/.next"
 } 
