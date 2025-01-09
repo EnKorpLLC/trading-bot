@@ -120,6 +120,22 @@ CREATE TABLE system_logs (
 );
 ```
 
+### User Risk Settings Table
+```sql
+CREATE TABLE user_risk_settings (
+    user_id VARCHAR(255) PRIMARY KEY,
+    max_position_size DECIMAL(10,4), -- % of account balance (0.10 = 10%)
+    max_daily_loss DECIMAL(10,4),    -- % of account balance (0.02 = 2%)
+    max_drawdown DECIMAL(10,4),      -- % of account balance (0.10 = 10%)
+    max_leverage DECIMAL(10,4),      -- e.g., 3.0 for 3x leverage
+    position_limit INTEGER,          -- Maximum number of open positions
+    max_correlation DECIMAL(10,4),   -- Maximum correlation between positions (0.70 = 70%)
+    risk_per_trade DECIMAL(10,4),    -- % risk per trade (0.01 = 1%)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
 ## Indexes
 ```sql
 CREATE INDEX idx_trades_session ON trades(session_id);
